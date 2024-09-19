@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package ipservice;
+
+option go_package = "github.com/stuttgart-things/clusterbook";
+
+service IpService {
+  rpc GetIpAddressRange (IpRequest) returns (IpResponse);
+  rpc SetClusterInfo (ClusterRequest) returns (ClusterResponse);
+}
+
+message IpRequest {
+  int32 countIpAddresses = 1;
+  string networkKey = 2;
+}
+
+message IpResponse {
+  string ipAddressRange = 1;
+}
+
+message ClusterRequest {
+  string ipAddressRange = 1;
+  string clusterName = 2;
+}
+
+message ClusterResponse {
+  string status = 1;
+}
