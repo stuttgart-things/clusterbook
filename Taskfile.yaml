@@ -5,9 +5,29 @@ vars:
     sh: echo ${PWD##*/}
   PROTO_DIR:
     sh: find . -type f -name "*.proto" -exec dirname {} \; | sort | uniq
+  BRANCH:
+    sh: if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then echo $(git rev-parse --abbrev-ref HEAD); else echo main ; fi
 
 tasks:
   proto:
     desc: Generate Go code from proto
     cmds:
       - protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative {{ .PROTO_DIR }}/*.proto
+
+  commit:
+    desc: Commit + push code into branch
+    cmds:
+      - rm -rf dist/
+      - git branch --set-upstream-to=origin/{{ .BRANCH }}
+      - git pull
+      - |
+        git add *
+        if [[ -n $(git status --porcelain) ]]; then
+          echo "ENTER COMMIT MESSAGE"
+          read COMMIT_MESSAGE;
+          echo "COMMITTING CHANGES"
+          git commit --allow-empty -a -m "$(echo ${COMMIT_MESSAGE})"
+        else
+          echo "NO CHANGES"
+        fi
+        git push origin -u {{ .BRANCH }}
