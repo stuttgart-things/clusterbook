@@ -20,6 +20,12 @@ tasks:
       - cmd: golangci-lint run
         ignore_error: true
 
+  test:
+    desc: Test code
+    cmds:
+      - go mod tidy
+      - cmd: go test ./... -v
+
   commit:
     desc: Commit + push code into branch
     cmds:

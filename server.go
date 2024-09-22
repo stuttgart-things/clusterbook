@@ -16,9 +16,12 @@ type server struct {
 }
 
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
-	// Beispiel-Implementierung: Generieren eines IP-Adressbereichs basierend auf countIpAddresses und networkKey
+
+	// LOAD CONFIG FROM HERE
+
 	ipAddressRange := fmt.Sprintf("Generated IP range for networkKey %s with %d addresses", req.NetworkKey, req.CountIpAddresses)
 	return &ipservice.IpResponse{IpAddressRange: ipAddressRange}, nil
+
 }
 
 func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterRequest) (*ipservice.ClusterResponse, error) {
