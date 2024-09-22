@@ -1,0 +1,22 @@
+---
+name: Validate-Golang
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  validate-golang:
+    name: Valdiate Golang
+    uses: stuttgart-things/stuttgart-things/.github/workflows/call-golang-validation.yaml@main
+    with:
+      module-name: clusterbook
+      environment-name: k8s
+      runs-on: ghr-clusterbook-skyami-cicd
+      golint-version: v1.61.0-alpine
+      golang-version: "1.23.1"
+      accept-linterrors: false
+      accept-failedtests: false
