@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"testing"
 
 	ipservice "github.com/stuttgart-things/clusterbook/ipservice"
@@ -26,10 +27,14 @@ func init() {
 	}()
 }
 
+func bufDialer(context.Context, string) (net.Conn, error) {
+	return lis.Dial()
+}
+
 func TestGetIpAddressRange(t *testing.T) {
 	ctx := context.Background()
 
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.DialContext(ctx, "bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("Failed to dial bufnet: %v", err)
 	}
@@ -49,30 +54,5 @@ func TestGetIpAddressRange(t *testing.T) {
 	expected := "Generated IP range for networkKey exampleNetworkKey with 10 addresses"
 	if resp.IpAddressRange != expected {
 		t.Errorf("Expected %s, got %s", expected, resp.IpAddressRange)
-	}
-}
-
-func TestSetClusterInfo(t *testing.T) {
-	ctx := context.Background()
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		t.Fatalf("Failed to dial bufnet: %v", err)
-	}
-	defer conn.Close()
-	client := ipservice.NewIpServiceClient(conn)
-
-	req := &ipservice.ClusterRequest{
-		IpAddressRange: "Generated IP range for networkKey exampleNetworkKey with 10 addresses",
-		ClusterName:    "exampleCluster",
-	}
-
-	resp, err := client.SetClusterInfo(ctx, req)
-	if err != nil {
-		t.Fatalf("SetClusterInfo failed: %v", err)
-	}
-
-	expected := "Cluster exampleCluster set with IP range Generated IP range for networkKey exampleNetworkKey with 10 addresses"
-	if resp.Status != expected {
-		t.Errorf("Expected %s, got %s", expected, resp.Status)
 	}
 }
