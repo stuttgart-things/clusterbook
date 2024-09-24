@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	//nolint
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
