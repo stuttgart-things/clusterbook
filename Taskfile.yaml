@@ -44,7 +44,7 @@ tasks:
     env:
       KO_DOCKER_REPO: ghcr.io/{{ .ORGA_NAME }}/{{ .PROJECT_NAME }}
     cmds:
-      - ko build {{ .MODULE }} --push
+      - ko build {{ .MODULE }} --image-label org.opencontainers.image.source=https://github.com/stuttgart-things/clusterbook --push
 
   proto:
     desc: Generate Go code from proto

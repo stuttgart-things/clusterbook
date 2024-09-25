@@ -5,8 +5,6 @@ builds:
   - id: machineshop
     dir: .
     main: main.go
-    labels:
-      org.opencontainers.image.source: https://github.com/stuttgart-things/clusterbook
     ldflags:
       - -s -w -X github.com/stuttgart-things/clusterbook/cmd.version={{.Git.Tag}}
       - -s -w -X github.com/stuttgart-things/clusterbook/cmd.date={{.Date}}
