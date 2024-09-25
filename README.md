@@ -1,6 +1,6 @@
 # stuttgart-things/clusterbook
 
-gitops cluster configuration management
+gitops configuration service
 
 <div align="center">
   <p>
