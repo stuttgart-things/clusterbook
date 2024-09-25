@@ -3,7 +3,7 @@ run:
 
 issues:
   exclude-files:
-    - server_test.go
+    - main_test.go
 
   exclude-dirs:
     - tests

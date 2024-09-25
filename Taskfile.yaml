@@ -25,6 +25,12 @@ tasks:
     cmds:
       - "$GOPATH/bin/{{ .PROJECT_NAME }}"
 
+  run-client:
+    desc: Run
+    deps: [build]
+    cmds:
+      - "go run tests/client.go"
+
   build:
     desc: Install
     deps: [lint, test]
