@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/stuttgart-things/clusterbook/internal"
 	ipservice "github.com/stuttgart-things/clusterbook/ipservice"
 
 	"google.golang.org/grpc"
@@ -31,6 +32,10 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 }
 
 func main() {
+
+	// PRINT BANNER + VERSION INFO
+	internal.PrintBanner()
+
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)

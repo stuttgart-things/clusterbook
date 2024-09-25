@@ -7,8 +7,27 @@ vars:
     sh: find . -type f -name "*.proto" -exec dirname {} \; | sort | uniq
   BRANCH:
     sh: if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then echo $(git rev-parse --abbrev-ref HEAD); else echo main ; fi
+  ORGA_NAME: stuttgart-things
+  MODULE: github.com/{{ .ORGA_NAME }}/{{ .PROJECT_NAME }}
+dotenv: ['.env', '{{.HOME}}/.env']
 
 tasks:
+
+  build:
+    desc: Install
+    deps: [lint, test]
+    cmds:
+      - go mod tidy
+      - go install -ldflags="-X {{ .MODULE }}/internal.version=123 -X {{ .MODULE }}/internal.date={{ .DATE }} -X {{ .MODULE }}/internal.commit={{ .GIT_COMMIT }}"
+
+  build-ko:
+    desc: Build image w/ KO
+    deps: [proto, lint, test, commit]
+    env:
+      KO_DOCKER_REPO: ghcr.io/{{ .ORGA_NAME }}/{{ .PROJECT_NAME }}
+    cmds:
+      - ko build {{ .MODULE }} --push
+
   proto:
     desc: Generate Go code from proto
     cmds:
