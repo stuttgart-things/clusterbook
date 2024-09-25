@@ -1,0 +1,10 @@
+---
+defaultBaseImage: ghcr.io/stuttgart-things/sthings-alpine:1.23
+builds:
+  - id: machineshop
+    dir: .
+    main: main.go
+    ldflags:
+      - -s -w -X github.com/stuttgart-things/clusterbook/cmd.version={{.Git.Tag}}
+      - -s -w -X github.com/stuttgart-things/clusterbook/cmd.date={{.Date}}
+      - -s -w -X github.com/stuttgart-things/clusterbook/cmd.commit={{.Git.ShortCommit}}

@@ -9,16 +9,28 @@ vars:
     sh: if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then echo $(git rev-parse --abbrev-ref HEAD); else echo main ; fi
   ORGA_NAME: stuttgart-things
   MODULE: github.com/{{ .ORGA_NAME }}/{{ .PROJECT_NAME }}
+  VERSION: 0.0.1-mvp
+  DATE:
+    sh: date -Ih
+  GIT_COMMIT:
+    sh: git log -n 1 --format=%h
+
 dotenv: ['.env', '{{.HOME}}/.env']
 
 tasks:
+
+  run:
+    desc: Run
+    deps: [build]
+    cmds:
+      - "$GOPATH/bin/{{ .PROJECT_NAME }}"
 
   build:
     desc: Install
     deps: [lint, test]
     cmds:
       - go mod tidy
-      - go install -ldflags="-X {{ .MODULE }}/internal.version=123 -X {{ .MODULE }}/internal.date={{ .DATE }} -X {{ .MODULE }}/internal.commit={{ .GIT_COMMIT }}"
+      - go install -ldflags="-X {{ .MODULE }}/internal.version={{ .VERSION }} -X {{ .MODULE }}/internal.date={{ .DATE }} -X {{ .MODULE }}/internal.commit={{ .GIT_COMMIT }}"
 
   build-ko:
     desc: Build image w/ KO
