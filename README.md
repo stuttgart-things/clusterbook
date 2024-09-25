@@ -12,12 +12,19 @@ gitops cluster configuration management
   </p>
 </div>
 
-## Install proto
+## DEV TASKS
 
 ```bash
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-sudo apt install protobuf-compiler
+task: Available tasks for this project:
+* branch:         Create branch from main
+* build:          Install
+* build-ko:       Build image w/ KO
+* commit:         Commit + push code into branch
+* lint:           Lint Golang
+* pr:             Create pull request into main
+* proto:          Generate Go code from proto
+* run:            Run
+* test:           Test code
 ```
 
 ## AUTHOR
