@@ -23,7 +23,7 @@ sudo apt install protobuf-compiler
 ## AUTHOR
 
 ```bash
-Patrick Hermann, stuttgart-things 12/2023
+Patrick Hermann, stuttgart-things 09/2024
 ```
 
 ## License
