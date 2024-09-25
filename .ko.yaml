@@ -1,8 +1,7 @@
 ---
 defaultBaseImage: ghcr.io/stuttgart-things/sthings-alpine:1.23
-
 builds:
-  - id: machineshop
+  - id: clusterbook
     dir: .
     main: main.go
     ldflags:
