@@ -23,9 +23,11 @@ jobs:
       timeout-minutes: 15m
 
   Image-Build:
-    name: Build golang oci conatiner image w/ ko
+    name: Build image w/ ko
     needs: Validate-Golang
     uses: stuttgart-things/stuttgart-things/.github/workflows/call-ko-build.yaml@main
     with:
       environment-name: k8s
       runs-on: ghr-clusterbook-skyami-cicd
+      registry-repo: ghcr.io/stuttgart-things/clusterbook
+      module-name: github.com/stuttgart-things/clusterbook
