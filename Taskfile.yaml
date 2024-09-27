@@ -18,7 +18,6 @@ vars:
 dotenv: ['.env', '{{.HOME}}/.env']
 
 tasks:
-
   run:
     desc: Run
     deps: [build]
