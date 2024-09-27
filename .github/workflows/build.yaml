@@ -34,3 +34,4 @@ jobs:
       registry: registry.homerun-dev.sthings-vsphere.labul.sva.de
       vault-path-username: apps/data/build-reg:username
       vault-path-password: apps/data/build-reg:password
+    secrets: inherit
