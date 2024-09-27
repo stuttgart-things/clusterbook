@@ -33,7 +33,7 @@ task: Available tasks for this project:
 Patrick Hermann, stuttgart-things 09/2024
 ```
 
-## License
+## LICENSE
 
 Licensed under the Apache License, Version 2.0 (the "License").
 
