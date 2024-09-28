@@ -1,5 +1,5 @@
 ---
-name: Validate & Build clusterbook
+name: Validate & Build clusterbook service
 on:
   workflow_dispatch:
   push:
