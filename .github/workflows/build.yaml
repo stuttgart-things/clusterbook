@@ -1,5 +1,5 @@
 ---
-name: Build clusterbook
+name: Validate & Build clusterbook
 on:
   workflow_dispatch:
   push:
