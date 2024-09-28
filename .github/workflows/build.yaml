@@ -1,5 +1,5 @@
 ---
-name: Golang Service CD
+name: Build clusterbook
 on:
   workflow_dispatch:
   push:
