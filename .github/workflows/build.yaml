@@ -29,7 +29,7 @@ jobs:
     with:
       environment-name: k8s
       runs-on: ghr-clusterbook-skyami-cicd
-      registry-repo: ghcr.io/stuttgart-things/clusterbook
+      registry-repo: registry.homerun-dev.sthings-vsphere.labul.sva.de
       module-name: github.com/stuttgart-things/clusterbook
       registry: registry.homerun-dev.sthings-vsphere.labul.sva.de
       vault-path-username: apps/data/build-reg:username
