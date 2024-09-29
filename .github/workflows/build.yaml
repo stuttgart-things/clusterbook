@@ -4,7 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - '*'
+      - 'main'
+      - 'feature/**'
+      - 'fix/**'
   pull_request:
     types: [opened, reopened]
 
@@ -17,21 +19,17 @@ jobs:
       environment-name: k8s
       runs-on: ghr-clusterbook-skyami-cicd
       golint-version: v1.61.0-alpine
-      golang-version: "1.23.1"
+      golang-version: 1.23.1
       accept-linterrors: false
       accept-failedtests: false
       timeout-minutes: 15m
 
-  Image-Build:
-    name: Build container image w/ ko
+  Build-Image:
+    name: Build Image
     needs: Validate-Golang
     uses: stuttgart-things/stuttgart-things/.github/workflows/call-ko-build.yaml@main
     with:
       environment-name: k8s
-      runs-on: ghr-clusterbook-skyami-cicd
-      registry: eu.gcr.io #registry.homerun-dev.sthings-vsphere.labul.sva.de
-      registry-repo: eu.gcr.io/stuttgart-things/clusterbook #registry.homerun-dev.sthings-vsphere.labul.sva.de
-      module-name: github.com/stuttgart-things/clusterbook
-      vault-path-username: apps/data/build-reg:username
-      vault-path-password: apps/data/build-reg:password
+      runs-on: docker
+      golang-version: 1.23.1
     secrets: inherit
