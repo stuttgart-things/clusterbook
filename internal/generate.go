@@ -5,64 +5,68 @@ Copyright © 2024 Patrick Hermann patrick.hermann@sva.de
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"math/rand"
 )
 
-func GenerateIPs(ipList map[string]map[string]string, requestedIPs int) {
+type IPInfo struct {
+	Status  string `yaml:"status"`
+	Cluster string `yaml:"cluster"`
+}
 
-	var availableAddresses []string
+type IPs map[string]IPInfo
 
-	for address, clusterInformation := range ipList {
-		fmt.Printf("Address: %s\n", address)
+func GenerateIPs(ipList map[string]IPs, requestedIPs int, networkKey string) (availableAddresses []string, err error) {
 
-		for clusterName, adressStatus := range clusterInformation {
-			fmt.Printf("  ClusterName: %s, Address Status: %s\n", clusterName, adressStatus)
+	if ipList, ok := ipList[networkKey]; ok {
+		fmt.Println("KEY EXISTS", ipList)
 
-			switch adressStatus {
+		for ip, adressStatus := range ipList {
+
+			address := networkKey + "." + ip
+
+			fmt.Println("IP-Address:", address)
+
+			fmt.Println("ClusterName:", adressStatus.Cluster)
+			fmt.Println("Status:", adressStatus.Status)
+
+			switch adressStatus.Status {
 			case "PENDING", "ASSIGNED":
 				// DO NOTHING
 			default:
 				availableAddresses = append(availableAddresses, address)
 			}
-
 		}
+
+		fmt.Printf("AVAILABLE ADDRESSES: %v\n", availableAddresses)
+
+		randomValues := pickRandomValues(availableAddresses, requestedIPs)
+
+		fmt.Printf("PICKED IPs %v\n", randomValues)
+
+	} else {
+		fmt.Println("KEY DOES NOT EXIST")
+		err = errors.New("KEY DOES NOT EXIST")
 	}
 
-	fmt.Printf("AVAILABLE ADDRESSES: %v\n", availableAddresses)
-
-	randomValues := pickRandomValues(availableAddresses, requestedIPs)
-
-	fmt.Printf("PICKED IPs %v\n", randomValues)
-
-	// innerMap, exists := ipList["outerKey1"]
-	// if exists {
-	// 	innerValue, innerExists := innerMap["innerKey1"]
-	// 	if innerExists {
-	// 		fmt.Printf("The value for 'outerKey1' -> 'innerKey1' is: %s\n", innerValue)
-	// 	} else {
-	// 		fmt.Println("The inner key 'innerKey1' does not exist.")
-	// 	}
-	// } else {
-	// 	fmt.Println("The outer key 'outerKey1' does not exist.")
-	// }
+	return
 
 }
 
-// Funktion zum zufälligen Auswählen von Werten aus einer String-Slice
 func pickRandomValues(slice []string, count int) []string {
 
 	source := rand.NewSource(time.Now().UnixNano())
 	rng := rand.New(source)
 
 	if count >= len(slice) {
-		return slice // Wenn die Anzahl der gewünschten Werte größer oder gleich der Länge der Slice ist, geben Sie die gesamte Slice zurück
+		return slice
 	}
 
 	picked := make([]string, 0, count)
-	indices := rng.Perm(len(slice)) // Zufällige Permutation der Indizes
+	indices := rng.Perm(len(slice))
 
 	for i := 0; i < count; i++ {
 		picked = append(picked, slice[indices[i]])
