@@ -5,6 +5,6 @@ builds:
     dir: .
     main: main.go
     ldflags:
-      - -s -w -X github.com/stuttgart-things/clusterbook/cmd.version={{.Git.Tag}}
-      - -s -w -X github.com/stuttgart-things/clusterbook/cmd.date={{.Date}}
-      - -s -w -X github.com/stuttgart-things/clusterbook/cmd.commit={{.Git.ShortCommit}}
+      - -s -w -X github.com/stuttgart-things/clusterbook/internal.version={{.Git.Tag}}
+      - -s -w -X github.com/stuttgart-things/clusterbook/internal.date={{.Date}}
+      - -s -w -X github.com/stuttgart-things/clusterbook/internal.commit={{.Git.ShortCommit}}
