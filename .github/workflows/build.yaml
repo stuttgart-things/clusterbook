@@ -12,7 +12,7 @@ on:
 
 jobs:
   Validate-Golang:
-    name: Valdiate Golang
+    name: Valdiate Golang Code
     uses: stuttgart-things/stuttgart-things/.github/workflows/call-golang-validation.yaml@main
     with:
       module-name: clusterbook
@@ -25,7 +25,7 @@ jobs:
       timeout-minutes: 15m
 
   Build-Image:
-    name: Build Image
+    name: Build Container Image
     needs: Validate-Golang
     uses: stuttgart-things/stuttgart-things/.github/workflows/call-ko-build.yaml@main
     permissions:
