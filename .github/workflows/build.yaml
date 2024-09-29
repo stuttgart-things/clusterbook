@@ -32,4 +32,4 @@ jobs:
       environment-name: k8s
       runs-on: docker
       golang-version: 1.23.1
-    secrets: inherit
+    # secrets: inherit
