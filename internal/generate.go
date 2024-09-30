@@ -7,9 +7,12 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"math/rand"
+
+	"gopkg.in/yaml.v2"
 )
 
 type IPInfo struct {
@@ -19,7 +22,9 @@ type IPInfo struct {
 
 type IPs map[string]IPInfo
 
-func GenerateIPs(ipList map[string]IPs, requestedIPs int, networkKey string) (availableAddresses []string, err error) {
+func GenerateIPs(ipList map[string]IPs, requestedIPs int, networkKey string) (randomValues []string, err error) {
+
+	var availableAddresses []string
 
 	if ipList, ok := ipList[networkKey]; ok {
 		fmt.Println("KEY EXISTS", ipList)
@@ -43,7 +48,7 @@ func GenerateIPs(ipList map[string]IPs, requestedIPs int, networkKey string) (av
 
 		fmt.Printf("AVAILABLE ADDRESSES: %v\n", availableAddresses)
 
-		randomValues := pickRandomValues(availableAddresses, requestedIPs)
+		randomValues = pickRandomValues(availableAddresses, requestedIPs)
 
 		fmt.Printf("PICKED IPs %v\n", randomValues)
 
@@ -73,4 +78,15 @@ func pickRandomValues(slice []string, count int) []string {
 	}
 
 	return picked
+}
+
+func LoadYAMLStructure(yamlData []byte) (ipList map[string]IPs) {
+
+	err := yaml.Unmarshal([]byte(yamlData), &ipList)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
+	return
+
 }

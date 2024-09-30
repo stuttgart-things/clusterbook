@@ -70,3 +70,44 @@ func TestGenerateIPs(t *testing.T) {
 	ips, err := GenerateIPs(data, requestedIPs, "10.31.103")
 	fmt.Println(ips, err)
 }
+
+func TestPickRandomValues(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []string
+		n      int
+	}{
+		{
+			name:   "Pick 3 values from a list of 5",
+			values: []string{"a", "b", "c", "d", "e"},
+			n:      3,
+		},
+		{
+			name:   "Pick 0 values from a list of 5",
+			values: []string{"a", "b", "c", "d", "e"},
+			n:      0,
+		},
+		{
+			name:   "Pick more values than available in the list",
+			values: []string{"a", "b", "c"},
+			n:      5,
+		},
+		{
+			name:   "Pick values from an empty list",
+			values: []string{},
+			n:      3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := pickRandomValues(tt.values, tt.n)
+			if len(got) != tt.n && tt.n <= len(tt.values) {
+				t.Errorf("pickRandomValues() = %v, want %v elements", got, tt.n)
+			}
+			if tt.n > len(tt.values) && len(got) != len(tt.values) {
+				t.Errorf("pickRandomValues() = %v, want %v elements", got, len(tt.values))
+			}
+		})
+	}
+}

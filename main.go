@@ -23,6 +23,15 @@ type server struct {
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
 
 	// LOAD CONFIG FROM HERE
+	ipList := internal.LoadProfile("disk", "tests/config.yaml")
+	fmt.Println(ipList)
+
+	availableAddresses, err := internal.GenerateIPs(ipList, 2, "10.31.103")
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
+	fmt.Println(availableAddresses)
 
 	ipAddressRange := fmt.Sprintf("Generated IP range for networkKey %s with %d addresses", req.NetworkKey, req.CountIpAddresses)
 	return &ipservice.IpResponse{IpAddressRange: ipAddressRange}, nil
