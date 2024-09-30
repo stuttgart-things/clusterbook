@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -51,7 +50,7 @@ func TestReadYAMLFileFromDisk(t *testing.T) {
 `
 
 	// Temporäre Datei erstellen
-	tmpFile, err := ioutil.TempFile("", "test*.yaml")
+	tmpFile, err := os.CreateTemp("", "test*.yaml")
 	if err != nil {
 		t.Fatalf("error creating temporary file: %v", err)
 	}
