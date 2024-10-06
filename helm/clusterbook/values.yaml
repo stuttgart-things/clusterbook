@@ -1,2 +1,35 @@
 ---
 namespace: clusterbook
+
+deployment:
+  name: clusterbook
+  labels:
+    app: clusterbook
+  selectorLabels:
+    app: clusterbook
+  ports:
+    app-port:
+      containerPort: 3000
+      protocol: TCP
+  allowPrivilegeEscalation: "false"
+  privileged: "false"
+  runAsNonRoot: "true"
+  readOnlyRootFilesystem: "true"
+  serviceAccount: clusterbook
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  containers:
+    clusterbook:
+      image: scr.cd43.sthings-pve.labul.sva.de/clusterbook/codehub.sva.de/lab/stuttgart-things/clusterbook/clusterbook@sha256
+      replicaCount: 1
+      imagePullPolicy: Always
+      tag: 62b9121d5b7a65964b90e113a6a239e12581d22d147f320d34a0d33b495662da
+      securityContext:
+        capabilities: {}
+  imagePullSecrets:
+    - gcr
