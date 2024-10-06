@@ -34,7 +34,6 @@ func GenerateIPs(ipList map[string]IPs, requestedIPs int, networkKey string) (ra
 			address := networkKey + "." + ip
 
 			fmt.Println("IP-Address:", address)
-
 			fmt.Println("ClusterName:", adressStatus.Cluster)
 			fmt.Println("Status:", adressStatus.Status)
 
