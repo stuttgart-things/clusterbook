@@ -16,6 +16,10 @@ deployment:
   runAsNonRoot: "true"
   readOnlyRootFilesystem: "true"
   serviceAccount: clusterbook
+  ports:
+    app-port:
+      containerPort: 50051
+      protocol: TCP
   resources:
     requests:
       cpu: 50m
@@ -31,5 +35,73 @@ deployment:
       tag: 62b9121d5b7a65964b90e113a6a239e12581d22d147f320d34a0d33b495662da
       securityContext:
         capabilities: {}
-  imagePullSecrets:
-    - gcr
+
+services:
+  clusterbook:
+    labels:
+      app: clusterbook
+    ports:
+      - name: grpc-port
+        protocol: TCP
+        value: 50051
+        expose:
+          service:
+            type: ClusterIP
+            port: 80
+    selectorLabels:
+      app: clusterbook
+
+
+# RBAC
+serviceAccounts:
+  clusterbook:
+    labels:
+      app: clusterbook
+roles:
+  clusterbook:
+    labels:
+      app: clusterbook
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - pods
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+roleBindings:
+  clusterbook:
+    labels:
+      app: clusterbook
+    roleRef:
+      kind: Role
+      name: clusterbook
+      apiGroup: rbac.authorization.k8s.io
+    subjects:
+      - kind: ServiceAccount
+        name: clusterbook
+        namespace: clusterbook
+clusterRoles:
+  list-all-namespaces:
+    labels:
+      app: clusterbook
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - namespaces
+        verbs:
+          - get
+          - list
+clusterRoleBindings:
+  list-all-namespaces-clusterbook:
+    roleRef:
+      kind: ClusterRole
+      name: list-all-namespaces
+      apiGroup: rbac.authorization.k8s.io
+    subjects:
+      - kind: ServiceAccount
+        name: clusterbook
+        namespace: clusterbook
