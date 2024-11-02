@@ -45,11 +45,16 @@ func GenerateIPs(ipList map[string]IPs, requestedIPs int, networkKey string) (ra
 			}
 		}
 
-		fmt.Printf("AVAILABLE ADDRESSES: %v\n", availableAddresses)
+		if len(availableAddresses) == 0 {
+			fmt.Println("NO AVAILABLE ADDRESSES")
+		} else if len(availableAddresses) >= requestedIPs {
+			randomValues = pickRandomValues(availableAddresses, requestedIPs)
+			fmt.Printf("PICKED IPs %v\n", randomValues)
 
-		randomValues = pickRandomValues(availableAddresses, requestedIPs)
-
-		fmt.Printf("PICKED IPs %v\n", randomValues)
+		} else {
+			fmt.Println("NOT ENOUGH AVAILABLE ADDRESSES")
+			err = errors.New("NOT ENOUGH AVAILABLE ADDRESSES")
+		}
 
 	} else {
 		fmt.Println("KEY DOES NOT EXIST")

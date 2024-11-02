@@ -29,6 +29,5 @@ func LoadProfile(source, path string) (ipList map[string]IPs) {
 	}
 
 	ipList = LoadYAMLStructure(yamlData)
-
 	return
 }

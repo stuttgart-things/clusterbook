@@ -3,8 +3,8 @@
     status: ""
     cluster: ""
   "4":
-    status: ASSIGNED
-    cluster: sandiego
+    status: PENDING
+    cluster: losangeles
   "5":
     status: ASSIGNED
     cluster: skyami
@@ -36,9 +36,3 @@
   "7":
     status: ASSIGNED
     cluster: blubber
-  "8":
-    status: ASSIGNED
-    cluster: miami
-  "9":
-    status: ASSIGNED
-    cluster: miami
