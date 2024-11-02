@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -25,14 +26,16 @@ func main() {
 
 	// Testen der GetIpAddressRange-Methode
 	ipReq := &ipservice.IpRequest{
-		CountIpAddresses: 10,
-		NetworkKey:       "exampleNetworkKey",
+		CountIpAddresses: 2,
+		NetworkKey:       "10.31.104",
 	}
 
 	ipRes, err := c.GetIpAddressRange(ctx, ipReq)
 	if err != nil {
 		log.Fatalf("could not get IP address range: %v", err)
 	}
+
+	fmt.Println(ipRes)
 
 	log.Printf("IP Address Range: %s", ipRes.IpAddressRange)
 

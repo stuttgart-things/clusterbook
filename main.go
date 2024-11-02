@@ -1,7 +1,6 @@
 /*
 Copyright © 2024 Patrick Hermann patrick.hermann@sva.de
 */
-// alex was here
 
 package main
 
@@ -10,7 +9,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"strings"
 
+	"github.com/pterm/pterm"
 	"github.com/stuttgart-things/clusterbook/internal"
 	ipservice "github.com/stuttgart-things/clusterbook/ipservice"
 
@@ -21,21 +23,35 @@ type server struct {
 	ipservice.UnimplementedIpServiceServer
 }
 
+var (
+	logger = pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace)
+)
+
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
 
+	// CONFIG FILE PATH FROM ENV
+	loadConfigFrom := os.Getenv("LOAD_CONFIG_FROM")
+	configFilePath := os.Getenv("CONFIG_FILE_PATH")
+	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
+	logger.Info("CONFIG FILE PATH", logger.Args("", configFilePath))
+	logger.Info("COUNT IPs", logger.Args("", req.CountIpAddresses))
+	logger.Info("NETWORK KEY", logger.Args("", req.NetworkKey))
+
 	// LOAD CONFIG FROM HERE
-	ipList := internal.LoadProfile("disk", "tests/config.yaml")
+	ipList := internal.LoadProfile(loadConfigFrom, configFilePath)
 	fmt.Println(ipList)
 
-	availableAddresses, err := internal.GenerateIPs(ipList, 2, "10.31.103")
+	availableAddresses, err := internal.GenerateIPs(ipList, int(req.CountIpAddresses), req.NetworkKey)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
 
 	fmt.Println(availableAddresses)
 
-	ipAddressRange := fmt.Sprintf("Generated IP range for networkKey %s with %d addresses", req.NetworkKey, req.CountIpAddresses)
-	return &ipservice.IpResponse{IpAddressRange: ipAddressRange}, nil
+	ips := strings.Join(availableAddresses, ";")
+
+	//ipAddressRange := fmt.Sprintf("Generated IP range for networkKey %s with %d addresses", req.NetworkKey, req.CountIpAddresses)
+	return &ipservice.IpResponse{IpAddressRange: ips}, nil
 
 }
 
