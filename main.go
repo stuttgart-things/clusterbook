@@ -77,6 +77,10 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 		}
 
 		ipDigit, err := internal.GetLastIPDigit(ip)
+		if err != nil {
+			log.Fatalf("error: %v", err)
+		}
+
 		entry := ipList[ipKey][ipDigit]
 
 		if entry.Status == "" {
