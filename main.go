@@ -24,14 +24,13 @@ type server struct {
 }
 
 var (
-	logger = pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace)
+	logger         = pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace)
+	loadConfigFrom = os.Getenv("LOAD_CONFIG_FROM")
+	configFilePath = os.Getenv("CONFIG_FILE_PATH")
 )
 
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
 
-	// CONFIG FILE PATH FROM ENV
-	loadConfigFrom := os.Getenv("LOAD_CONFIG_FROM")
-	configFilePath := os.Getenv("CONFIG_FILE_PATH")
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
 	logger.Info("CONFIG FILE PATH", logger.Args("", configFilePath))
 	logger.Info("COUNT IPs", logger.Args("", req.CountIpAddresses))
@@ -46,17 +45,56 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 		log.Fatalf("error: %v", err)
 	}
 
-	fmt.Println(availableAddresses)
+	logger.Info("AVAILABLE ADDRESSES", logger.Args("", availableAddresses))
 
-	ips := strings.Join(availableAddresses, ";")
-
-	//ipAddressRange := fmt.Sprintf("Generated IP range for networkKey %s with %d addresses", req.NetworkKey, req.CountIpAddresses)
-	return &ipservice.IpResponse{IpAddressRange: ips}, nil
+	if len(availableAddresses) == 0 {
+		return &ipservice.IpResponse{IpAddressRange: "NO AVAILABLE ADDRESSES"}, nil
+	} else {
+		ips := strings.Join(availableAddresses, ";")
+		return &ipservice.IpResponse{IpAddressRange: ips}, nil
+	}
 
 }
 
 func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterRequest) (*ipservice.ClusterResponse, error) {
-	// Beispiel-Implementierung: Setzen von Cluster-Informationen basierend auf ipAddressRange und clusterName
+
+	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
+	logger.Info("CONFIG FILE PATH", logger.Args("", configFilePath))
+
+	// LOAD EXISTING YAML FILE
+	ipList := internal.LoadProfile(loadConfigFrom, configFilePath)
+
+	// GET IPS FROM REQUEST
+	ips := strings.Split(req.IpAddressRange, ";")
+
+	// LOOP OVEER ips
+	for _, ip := range ips {
+
+		// TRUNCATE IP
+		ipKey, err := internal.TruncateIP(ip)
+		if err != nil {
+			log.Fatalf("error: %v", err)
+		}
+
+		ipDigit, err := internal.GetLastIPDigit(ip)
+		entry := ipList[ipKey][ipDigit]
+
+		if entry.Status == "" {
+			logger.Info("IP WAS NOT SET", logger.Args("", ipKey+"."+ipDigit))
+		}
+		entry.Status = "ASSIGNED" // Modify the field
+		entry.Cluster = req.ClusterName
+
+		ipList[ipKey][ipDigit] = entry // Reassign the modified struct back to the map
+		logger.Info("IP WAS ASSIGNED", logger.Args("", ipKey+"."+ipDigit))
+
+	}
+
+	fmt.Println(ipList)
+
+	// SAVE YAML FILE
+	internal.SaveYAMLToDisk(ipList, configFilePath)
+
 	status := fmt.Sprintf("Cluster %s set with IP range %s", req.ClusterName, req.IpAddressRange)
 	return &ipservice.ClusterResponse{Status: status}, nil
 }
