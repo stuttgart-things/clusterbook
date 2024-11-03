@@ -1,6 +1,20 @@
 ---
 namespace: clusterbook
 
+pvcs:
+  sthings-kaniko-workspace:
+    volumeMode: Filesystem
+    namespace: sthings-tekton
+    storageClassName: ontap
+    storage: 5Gi
+    accessModes:
+      - ReadWriteOnce
+
+configmaps:
+  homerun-demo-pitcher:
+    LOAD_CONFIG_FROM: disk
+
+
 deployment:
   name: clusterbook
   labels:
@@ -32,7 +46,7 @@ deployment:
       image: ghcr.io/stuttgart-things/clusterbook/clusterbook-5f3bb9105a15fafb0e52842968611a61@sha256
       replicaCount: 1
       imagePullPolicy: Always
-      tag: b319919a99308fb2e53270ee457b6e76cf192761e740aeaf5db1be47dcbe2df4
+      tag: 89c8afe484e46e4cd946adafb32f396fc451a1d79352e8d4a1d3b56987389f1e
       securityContext:
         capabilities: {}
 
