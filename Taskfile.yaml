@@ -10,6 +10,10 @@ vars:
   ORGA_NAME: stuttgart-things
   MODULE: github.com/{{ .ORGA_NAME }}/{{ .PROJECT_NAME }}
   VERSION: 0.0.1-mvp
+  CHART_DIR: helm
+  CHART_VERSION:
+    sh: grep 'version:' ./{{ .CHART_DIR }}/{{ .PROJECT_NAME }}/Chart.yaml | head -n1 | awk '{ print $2 }'
+
   DATE:
     sh: date -Ih
   GIT_COMMIT:
@@ -47,6 +51,10 @@ tasks:
         BUILD_IMAGE=$(ko build {{ .MODULE }} --image-label org.opencontainers.image.source=https://github.com/stuttgart-things/clusterbook --push)
         echo ${BUILD_IMAGE}
         dagger call -m github.com/jpadams/daggerverse/trivy@v0.3.0 scan-image --image-ref ${BUILD_IMAGE}
+
+        # UPDATE HELM CHART
+        sed -i "s|^\(\s*image:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $1}')|" {{ .CHART_DIR }}/{{ .PROJECT_NAME }}/values.yaml
+        sed -i "s|^\(\s*tag:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')|" {{ .CHART_DIR }}//{{ .PROJECT_NAME }}/values.yaml
 
   proto:
     desc: Generate Go code from proto
