@@ -32,3 +32,22 @@ func GetLastIPDigit(ip string) (string, error) {
 	// Return the last segment
 	return segments[len(segments)-1], nil
 }
+
+func ConvertToCRFormat(info map[string]IPs) map[string][]string {
+	networks := make(map[string][]string)
+
+	// Iterate over the info map to populate the networks map
+	for ip, ipDetails := range info {
+		for ipDigit, details := range ipDetails {
+			if details.Status != "" && details.Cluster != "" {
+				// Format: "ipDigit:status:cluster"
+				networks[ip] = append(networks[ip], fmt.Sprintf("%s:%s:%s", ipDigit, details.Status, details.Cluster))
+			} else {
+				// Just add the ipDigit if status or cluster is empty
+				networks[ip] = append(networks[ip], ipDigit)
+			}
+		}
+	}
+
+	return networks
+}
