@@ -61,3 +61,9 @@ Session.vim
 **/charts/*.tgz
 
 .history
+
+
+app_linux_amd64
+app_linux_arm64
+
+build/*
