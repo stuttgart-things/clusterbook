@@ -1,10 +1,9 @@
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: networkconfigs.clusterbook.stuttgart-things.com
+  name: networkconfigs.example.com
 spec:
-  group: clusterbook.stuttgart-things.com
+  group: example.com
   names:
     kind: NetworkConfig
     listKind: NetworkConfigList
@@ -28,18 +27,3 @@ spec:
                     type: array
                     items:
                       type: string
----
-apiVersion: clusterbook.stuttgart-things.com/v1
-kind: NetworkConfig
-metadata:
-  name: networks-labul
-  namespace: default  # Ensure this is the correct namespace
-spec:
-  networks:  # Corrected property name from 'newtorks' to 'networks'
-    "10.31.103":
-      - "3:assigned:sandiego"
-      - "4"
-    "10.31.104":
-      - "8:pending:miami"
-      - "10"
-      - "11"
