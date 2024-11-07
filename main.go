@@ -57,6 +57,8 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 }
 
 func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterRequest) (*ipservice.ClusterResponse, error) {
+         
+	//var bla = "hello"
 
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
 	logger.Info("CONFIG FILE PATH", logger.Args("", configFilePath))

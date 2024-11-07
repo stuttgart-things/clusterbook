@@ -12,8 +12,8 @@
     status: ""
     cluster: ""
   "7":
-    status: ""
-    cluster: ""
+    status: ASSIGNED
+    cluster: martino
   "8":
     status: ""
     cluster: ""
