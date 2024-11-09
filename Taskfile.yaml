@@ -13,7 +13,6 @@ vars:
   CHART_DIR: helm
   CHART_VERSION:
     sh: grep 'version:' ./{{ .CHART_DIR }}/{{ .PROJECT_NAME }}/Chart.yaml | head -n1 | awk '{ print $2 }'
-
   DATE:
     sh: date -Ih
   GIT_COMMIT:
