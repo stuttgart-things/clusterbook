@@ -36,9 +36,18 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 	logger.Info("COUNT IPs", logger.Args("", req.CountIpAddresses))
 	logger.Info("NETWORK KEY", logger.Args("", req.NetworkKey))
 
-	// LOAD CONFIG FROM HERE
+	// READ NetworkConfig FROM CR
+	retrievedConfig, err := internal.GetNetworkConfig("networks-labul-2", "default")
+	if err != nil {
+		log.Fatalf("Failed to get NetworkConfig: %v", err)
+	}
+	fmt.Println("NETWORKS FROM CR:", retrievedConfig.Spec.Networks)
+
+	// READ NetworkConfig FROM STATIC YAML FILE
 	ipList := internal.LoadProfile(loadConfigFrom, configFilePath)
-	fmt.Println(ipList)
+	fmt.Println("NETWORKS FROM STATC YAML FILE:", ipList)
+	result := internal.ConvertToCRFormat(ipList)
+	fmt.Println("NETWORKS CONVERT TO CR FORMAT:", result)
 
 	availableAddresses, err := internal.GenerateIPs(ipList, int(req.CountIpAddresses), req.NetworkKey)
 	if err != nil {
@@ -57,7 +66,7 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 }
 
 func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterRequest) (*ipservice.ClusterResponse, error) {
-         
+
 	//var bla = "hello"
 
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))

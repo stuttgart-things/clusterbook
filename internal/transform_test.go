@@ -108,3 +108,38 @@ func TestTruncateIP(t *testing.T) {
 		}
 	}
 }
+
+// TestConvertFromCRFormat tests the ConvertFromCRFormat function
+func TestConvertFromCRFormat(t *testing.T) {
+	// Input data in CR format
+	data := map[string][]string{
+		"10.31.103": {
+			"3:assigned:sandiego",
+			"4",
+			"5",
+		},
+		"10.31.104": {
+			"4:pending:losangeles",
+			"5",
+		},
+	}
+
+	expected := map[string]IPs{
+		"10.31.103": {
+			"3": {Status: "assigned", Cluster: "sandiego"},
+			"4": {Status: "", Cluster: ""},
+			"5": {Status: "", Cluster: ""},
+		},
+		"10.31.104": {
+			"4": {Status: "pending", Cluster: "losangeles"},
+			"5": {Status: "", Cluster: ""},
+		},
+	}
+
+	result := ConvertFromCRFormat(data)
+
+	// Compare results
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Expected %v, but got %v", expected, result)
+	}
+}

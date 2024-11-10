@@ -53,7 +53,7 @@ func LoadProfile(source, path string) (ipList map[string]IPs) {
 }
 
 // FUNCTION TO GET A NETWORKCONFIG RESOURCE
-func GetNetworkConfig(namespace, name string) (*NetworkConfig, error) {
+func GetNetworkConfig(name, namespace string) (*NetworkConfig, error) {
 
 	// CREATE A DYNAMIC CLIENT
 	dynClient, err := CreateDynamicKubeConfigClient()
