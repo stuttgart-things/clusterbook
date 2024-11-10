@@ -6,6 +6,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -46,6 +47,17 @@ func LoadProfile(source, path string) (ipList map[string]IPs) {
 		if err != nil {
 			log.Fatalf("error: %v", err)
 		}
+	case "cr":
+		// READ NetworkConfig FROM CR
+		retrievedConfig, err := GetNetworkConfig("networks-labul-2", "default")
+		if err != nil {
+			log.Fatalf("Failed to get NetworkConfig: %v", err)
+		}
+		fmt.Println("NETWORKS FROM CR:", retrievedConfig.Spec.Networks)
+		ipList = ConvertFromCRFormat(retrievedConfig.Spec.Networks)
+		fmt.Println("NETWORKS CONVERT TO IPLIST FORMAT:", ipList)
+	default:
+		log.Fatalf("INVALID LOAD_CONFIG_FROM VALUE: %s", source)
 	}
 
 	ipList = LoadYAMLStructure(yamlData)
