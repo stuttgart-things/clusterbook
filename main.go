@@ -27,6 +27,7 @@ var (
 	logger         = pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace)
 	loadConfigFrom = os.Getenv("LOAD_CONFIG_FROM")
 	configFilePath = os.Getenv("CONFIG_FILE_PATH")
+	// ipList         map[string]internal.IPs
 )
 
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
@@ -36,20 +37,40 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 	logger.Info("COUNT IPs", logger.Args("", req.CountIpAddresses))
 	logger.Info("NETWORK KEY", logger.Args("", req.NetworkKey))
 
+	// switch loadConfigFrom {
+	// case "cr":
+	// 	// READ NetworkConfig FROM CR
+	// 	retrievedConfig, err := internal.GetNetworkConfig("networks-labul-2", "default")
+	// 	if err != nil {
+	// 		log.Fatalf("Failed to get NetworkConfig: %v", err)
+	// 	}
+	// 	fmt.Println("NETWORKS FROM CR:", retrievedConfig.Spec.Networks)
+	// 	ipList = internal.ConvertFromCRFormat(retrievedConfig.Spec.Networks)
+	// 	fmt.Println("NETWORKS CONVERT TO IPLIST FORMAT:", ipList)
+	// case "disk":
+	// 	// READ NetworkConfig FROM STATIC YAML FILE
+	// 	ipList = internal.LoadProfile(loadConfigFrom, configFilePath)
+	// 	fmt.Println("NETWORKS FROM STATIC YAML FILE:", ipList)
+	// default:
+	// 	log.Fatalf("INVALID LOAD_CONFIG_FROM VALUE: %s", loadConfigFrom)
+	// }
+
 	// READ NetworkConfig FROM CR
-	retrievedConfig, err := internal.GetNetworkConfig("networks-labul-2", "default")
-	if err != nil {
-		log.Fatalf("Failed to get NetworkConfig: %v", err)
-	}
-	fmt.Println("NETWORKS FROM CR:", retrievedConfig.Spec.Networks)
-	ipListFormat := internal.ConvertFromCRFormat(retrievedConfig.Spec.Networks)
-	fmt.Println("NETWORKS CONVERT TO IPLIST FORMAT:", ipListFormat)
+	// retrievedConfig, err := internal.GetNetworkConfig("networks-labul-2", "default")
+	// if err != nil {
+	// 	log.Fatalf("Failed to get NetworkConfig: %v", err)
+	// }
+	// fmt.Println("NETWORKS FROM CR:", retrievedConfig.Spec.Networks)
+	// ipList := internal.ConvertFromCRFormat(retrievedConfig.Spec.Networks)
+	// fmt.Println("NETWORKS CONVERT TO IPLIST FORMAT:", ipList)
 
 	// READ NetworkConfig FROM STATIC YAML FILE
 	ipList := internal.LoadProfile(loadConfigFrom, configFilePath)
 	fmt.Println("NETWORKS FROM STATC YAML FILE:", ipList)
-	result := internal.ConvertToCRFormat(ipList)
-	fmt.Println("NETWORKS CONVERT TO CR FORMAT:", result)
+
+	// CONVERT TO CR FORMAT
+	// result := internal.ConvertToCRFormat(ipList)
+	// fmt.Println("NETWORKS CONVERT TO CR FORMAT:", result)
 
 	availableAddresses, err := internal.GenerateIPs(ipList, int(req.CountIpAddresses), req.NetworkKey)
 	if err != nil {
