@@ -51,3 +51,30 @@ func ConvertToCRFormat(info map[string]IPs) map[string][]string {
 
 	return networks
 }
+
+func ConvertFromCRFormat(data map[string][]string) map[string]IPs {
+	result := make(map[string]IPs)
+
+	for ip, entries := range data {
+		ipMap := make(IPs)
+
+		for _, entry := range entries {
+			parts := strings.Split(entry, ":")
+			ipDigit := parts[0]
+
+			info := IPInfo{}
+			if len(parts) > 1 {
+				info.Status = parts[1]
+				if len(parts) > 2 {
+					info.Cluster = parts[2]
+				}
+			}
+
+			ipMap[ipDigit] = info
+		}
+
+		result[ip] = ipMap
+	}
+
+	return result
+}

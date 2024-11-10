@@ -28,7 +28,7 @@ func CreateDynamicKubeConfigClient() (dynClient dynamic.Interface, err error) {
 	return
 }
 
-// Function to create a dynamic client for CRDs
+// FUNCTION TO CREATE A DYNAMIC CLIENT FOR CRDS
 func createDynamicClient(config *rest.Config) (dynamic.Interface, error) {
 	return dynamic.NewForConfig(config)
 }
