@@ -42,6 +42,8 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 		log.Fatalf("Failed to get NetworkConfig: %v", err)
 	}
 	fmt.Println("NETWORKS FROM CR:", retrievedConfig.Spec.Networks)
+	ipListFormat := internal.ConvertFromCRFormat(retrievedConfig.Spec.Networks)
+	fmt.Println("NETWORKS CONVERT TO IPLIST FORMAT:", ipListFormat)
 
 	// READ NetworkConfig FROM STATIC YAML FILE
 	ipList := internal.LoadProfile(loadConfigFrom, configFilePath)
