@@ -5,10 +5,15 @@ Copyright © 2024 Patrick Hermann patrick.hermann@sva.de
 package internal
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func SaveYAMLToDisk(ipList map[string]IPs, filename string) {
@@ -35,4 +40,42 @@ func SaveYAMLToDisk(ipList map[string]IPs, filename string) {
 	}
 
 	fmt.Printf("YAML data successfully written to %s\n", filename)
+}
+
+func CreateOrUpdateNetworkConfig(ns string, networkConfig *NetworkConfig) error {
+
+	// CREATE A DYNAMIC CLIENT
+	dynClient, err := CreateDynamicKubeConfigClient()
+	if err != nil {
+		return err
+	}
+
+	// Convert the NetworkConfig struct to an unstructured format
+	unstructuredConfig, err := runtime.DefaultUnstructuredConverter.ToUnstructured(networkConfig)
+	if err != nil {
+		return err
+	}
+
+	// SET THE GROUP VERSION RESOURCE
+	resourceClient := dynClient.Resource(groupVersion.WithResource(resource)).Namespace(ns)
+
+	// TRY TO UPDATE THE RESOURCE IF IT ALREADY EXISTS
+	existingResource, err := resourceClient.Get(context.TODO(), networkConfig.Name, v1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// If not found, create a new one
+			_, err = resourceClient.Create(context.TODO(), &unstructured.Unstructured{
+				Object: unstructuredConfig,
+			}, v1.CreateOptions{})
+			return err
+		}
+		return err // Handle other errors
+	}
+
+	// IF IT EXISTS, UPDATE THE RESOURCE
+	unstructuredConfig["metadata"] = existingResource.Object["metadata"] // Retain the existing metadata (e.g., UID, resource version)
+	_, err = resourceClient.Update(context.TODO(), &unstructured.Unstructured{
+		Object: unstructuredConfig,
+	}, v1.UpdateOptions{})
+	return err
 }
