@@ -53,11 +53,9 @@ func main() {
 	// log.Printf("Cluster Status: %s", clusterRes.Status)
 	GetIps(2, "10.31.103")
 	SetIpStatus("10.31.103.7", "ipat")
-
 }
 
 func GetIps(countIps int32, networkKey string) {
-
 	//nolint
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -84,11 +82,9 @@ func GetIps(countIps int32, networkKey string) {
 	fmt.Println(ipRes)
 
 	log.Printf("IP Address Range: %s", ipRes.IpAddressRange)
-
 }
 
 func SetIpStatus(ips, clusterName string) {
-
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
@@ -112,5 +108,4 @@ func SetIpStatus(ips, clusterName string) {
 	}
 
 	log.Printf("Cluster Status: %s", clusterRes.Status)
-
 }

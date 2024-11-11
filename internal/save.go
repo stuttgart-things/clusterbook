@@ -25,7 +25,7 @@ func SaveYAMLToDisk(ipList map[string]IPs, filename string) {
 	}
 
 	// Open the file with O_CREATE and O_TRUNC flags to overwrite if it exists
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		fmt.Printf("Error opening file: %v\n", err)
 		return
@@ -43,7 +43,6 @@ func SaveYAMLToDisk(ipList map[string]IPs, filename string) {
 }
 
 func CreateOrUpdateNetworkConfig(info map[string][]string, resourceName, namespace string) error {
-
 	networkConfig := &NetworkConfig{
 		TypeMeta: v1.TypeMeta{
 			APIVersion: groupVersion.String(),

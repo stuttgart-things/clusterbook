@@ -69,5 +69,4 @@ func PrintBanner() string {
 	resp := goVersion.FuncWithOutput(false, version, commit, date, output)
 	color.Magenta(resp + "\n")
 	return resp
-
 }
