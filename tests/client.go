@@ -52,7 +52,7 @@ func main() {
 
 	// log.Printf("Cluster Status: %s", clusterRes.Status)
 	GetIps(2, "10.31.103")
-	SetIpStatus("10.31.103.7", "martino")
+	SetIpStatus("10.31.103.7", "ipat")
 
 }
 
