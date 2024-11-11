@@ -34,7 +34,7 @@ func ReadYAMLFileFromDisk(filePath string) ([]byte, error) {
 	return os.ReadFile(filePath)
 }
 
-func LoadProfile(source, path string) (ipList map[string]IPs) {
+func LoadProfile(source, configLocation, configName string) (ipList map[string]IPs) {
 
 	// READ YAML FILE
 	var err error
@@ -43,7 +43,7 @@ func LoadProfile(source, path string) (ipList map[string]IPs) {
 	switch source {
 	// READ NetworkConfig FROM DISK
 	case "disk":
-		yamlData, err = ReadYAMLFileFromDisk(path)
+		yamlData, err = ReadYAMLFileFromDisk(configLocation + "/" + configName)
 		if err != nil {
 			log.Fatalf("error: %v", err)
 		}
@@ -65,7 +65,7 @@ func LoadProfile(source, path string) (ipList map[string]IPs) {
 }
 
 // FUNCTION TO GET A NETWORKCONFIG RESOURCE
-func GetNetworkConfig(name, namespace string) (*NetworkConfig, error) {
+func GetNetworkConfig(resourceName, namespace string) (*NetworkConfig, error) {
 
 	// CREATE A DYNAMIC CLIENT
 	dynClient, err := CreateDynamicKubeConfigClient()
@@ -75,7 +75,7 @@ func GetNetworkConfig(name, namespace string) (*NetworkConfig, error) {
 
 	// RETRIEVE THE RESOURCE
 	resourceClient := dynClient.Resource(groupVersion.WithResource(resource)).Namespace(namespace)
-	unstructuredConfig, err := resourceClient.Get(context.TODO(), name, v1.GetOptions{})
+	unstructuredConfig, err := resourceClient.Get(context.TODO(), resourceName, v1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

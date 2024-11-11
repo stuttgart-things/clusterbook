@@ -26,14 +26,15 @@ type server struct {
 var (
 	logger         = pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace)
 	loadConfigFrom = os.Getenv("LOAD_CONFIG_FROM")
-	configFilePath = os.Getenv("CONFIG_FILE_PATH")
-	// ipList         map[string]internal.IPs
+	configName     = os.Getenv("CONFIG_NAME")
+	configLocation = os.Getenv("CONFIG_LOCATION")
 )
 
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
 
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
-	logger.Info("CONFIG FILE PATH", logger.Args("", configFilePath))
+	logger.Info("CONFIG NAME", logger.Args("", configName))
+	logger.Info("CONFIG LOCATION", logger.Args("", configLocation))
 	logger.Info("COUNT IPs", logger.Args("", req.CountIpAddresses))
 	logger.Info("NETWORK KEY", logger.Args("", req.NetworkKey))
 
@@ -65,7 +66,7 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 	// fmt.Println("NETWORKS CONVERT TO IPLIST FORMAT:", ipList)
 
 	// READ NetworkConfig FROM STATIC YAML FILE
-	ipList := internal.LoadProfile(loadConfigFrom, configFilePath)
+	ipList := internal.LoadProfile(loadConfigFrom, configLocation, configName)
 	fmt.Println("NETWORKS FROM STATC YAML FILE:", ipList)
 
 	// CONVERT TO CR FORMAT
@@ -90,13 +91,11 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 
 func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterRequest) (*ipservice.ClusterResponse, error) {
 
-	//var bla = "hello"
-
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
-	logger.Info("CONFIG FILE PATH", logger.Args("", configFilePath))
+	logger.Info("CONFIG FILE PATH", logger.Args("", configLocation+"/"+configName))
 
 	// LOAD EXISTING YAML FILE
-	ipList := internal.LoadProfile(loadConfigFrom, configFilePath)
+	ipList := internal.LoadProfile(loadConfigFrom, configLocation, configName)
 
 	// GET IPS FROM REQUEST
 	ips := strings.Split(req.IpAddressRange, ";")
@@ -129,11 +128,21 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	}
 
 	fmt.Println(ipList)
+	status := fmt.Sprintf("Cluster %s set with IP range %s", req.ClusterName, req.IpAddressRange)
 
 	// SAVE YAML FILE
-	internal.SaveYAMLToDisk(ipList, configFilePath)
+	switch loadConfigFrom {
 
-	status := fmt.Sprintf("Cluster %s set with IP range %s", req.ClusterName, req.IpAddressRange)
+	case "disk":
+		internal.SaveYAMLToDisk(ipList, configLocation+"/"+configName)
+	case "cr":
+		ipListCR := internal.ConvertToCRFormat(ipList)
+		err := internal.CreateOrUpdateNetworkConfig(ipListCR, configName, configLocation)
+		fmt.Println(err)
+	default:
+		log.Fatalf("INVALID LOAD_CONFIG_FROM VALUE: %s", loadConfigFrom)
+	}
+
 	return &ipservice.ClusterResponse{Status: status}, nil
 }
 

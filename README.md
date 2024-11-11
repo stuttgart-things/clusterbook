@@ -33,6 +33,27 @@ task: Available tasks for this project:
 Patrick Hermann, stuttgart-things 09/2024
 ```
 
+## EXAMPLE .env file
+
+<details><summary>ENV FILE</summary>
+
+.env file needed for Taskfile
+
+```bash
+cat <<EOF > .env
+#LOAD_CONFIG_FROM=disk
+#CONFIG_LOCATION=tests
+#CONFIG_NAME=config.yaml
+
+LOAD_CONFIG_FROM=cr
+CONFIG_LOCATION=default #namespace
+CONFIG_NAME=networks-labul-2 #resource-name
+EOF
+```
+
+</details>
+
+
 ## LICENSE
 
 Licensed under the Apache License, Version 2.0 (the "License").

@@ -42,7 +42,21 @@ func SaveYAMLToDisk(ipList map[string]IPs, filename string) {
 	fmt.Printf("YAML data successfully written to %s\n", filename)
 }
 
-func CreateOrUpdateNetworkConfig(ns string, networkConfig *NetworkConfig) error {
+func CreateOrUpdateNetworkConfig(info map[string][]string, resourceName, namespace string) error {
+
+	networkConfig := &NetworkConfig{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: groupVersion.String(),
+			Kind:       "NetworkConfig",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      resourceName,
+			Namespace: namespace,
+		},
+		Spec: NetworkConfigSpec{
+			info,
+		},
+	}
 
 	// CREATE A DYNAMIC CLIENT
 	dynClient, err := CreateDynamicKubeConfigClient()
@@ -50,14 +64,14 @@ func CreateOrUpdateNetworkConfig(ns string, networkConfig *NetworkConfig) error 
 		return err
 	}
 
-	// Convert the NetworkConfig struct to an unstructured format
+	// CONVERT THE NETWORKCONFIG STRUCT TO AN UNSTRUCTURED FORMAT
 	unstructuredConfig, err := runtime.DefaultUnstructuredConverter.ToUnstructured(networkConfig)
 	if err != nil {
 		return err
 	}
 
 	// SET THE GROUP VERSION RESOURCE
-	resourceClient := dynClient.Resource(groupVersion.WithResource(resource)).Namespace(ns)
+	resourceClient := dynClient.Resource(groupVersion.WithResource(resource)).Namespace(namespace)
 
 	// TRY TO UPDATE THE RESOURCE IF IT ALREADY EXISTS
 	existingResource, err := resourceClient.Get(context.TODO(), networkConfig.Name, v1.GetOptions{})

@@ -78,6 +78,6 @@ func TestReadYAMLFileFromDisk(t *testing.T) {
 
 func TestLoadProfile(t *testing.T) {
 
-	ipList := LoadProfile("disk", "../tests/config.yaml")
+	ipList := LoadProfile("disk", "../tests", "config.yaml")
 	fmt.Println(ipList)
 }
