@@ -13,7 +13,6 @@ import (
 )
 
 func TestGenerateIPs(t *testing.T) {
-
 	yamlData := `
 10.31.103:
   3:

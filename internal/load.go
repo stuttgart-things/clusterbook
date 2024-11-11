@@ -26,8 +26,10 @@ type NetworkConfigSpec struct {
 }
 
 // CREATE THE CUSTOM RESOURCE GROUPVERSION
-var groupVersion = schema.GroupVersion{Group: "example.com", Version: "v1"}
-var resource = "networkconfigs"
+var (
+	groupVersion = schema.GroupVersion{Group: "example.com", Version: "v1"}
+	resource     = "networkconfigs"
+)
 
 // READY YAML FILE FROM DISK
 func ReadYAMLFileFromDisk(filePath string) ([]byte, error) {
@@ -35,7 +37,6 @@ func ReadYAMLFileFromDisk(filePath string) ([]byte, error) {
 }
 
 func LoadProfile(source, configLocation, configName string) (ipList map[string]IPs) {
-
 	// READ YAML FILE
 	var err error
 	var yamlData []byte
@@ -66,7 +67,6 @@ func LoadProfile(source, configLocation, configName string) (ipList map[string]I
 
 // FUNCTION TO GET A NETWORKCONFIG RESOURCE
 func GetNetworkConfig(resourceName, namespace string) (*NetworkConfig, error) {
-
 	// CREATE A DYNAMIC CLIENT
 	dynClient, err := CreateDynamicKubeConfigClient()
 	if err != nil {

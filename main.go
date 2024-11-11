@@ -31,7 +31,6 @@ var (
 )
 
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
-
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
 	logger.Info("CONFIG NAME", logger.Args("", configName))
 	logger.Info("CONFIG LOCATION", logger.Args("", configLocation))
@@ -86,11 +85,9 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 		ips := strings.Join(availableAddresses, ";")
 		return &ipservice.IpResponse{IpAddressRange: ips}, nil
 	}
-
 }
 
 func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterRequest) (*ipservice.ClusterResponse, error) {
-
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
 	logger.Info("CONFIG FILE PATH", logger.Args("", configLocation+"/"+configName))
 
@@ -147,7 +144,6 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 }
 
 func main() {
-
 	// PRINT BANNER + VERSION INFO
 	internal.PrintBanner()
 
