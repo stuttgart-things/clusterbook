@@ -27,8 +27,10 @@ type NetworkConfigSpec struct {
 
 // CREATE THE CUSTOM RESOURCE GROUPVERSION
 var (
-	groupVersion = schema.GroupVersion{Group: "example.com", Version: "v1"}
-	resource     = "networkconfigs"
+	groupVersion   = schema.GroupVersion{Group: "github.stuttgart-things.com", Version: "v1"}
+	resource       = "networkconfigs"
+	configName     = os.Getenv("CONFIG_NAME")
+	configLocation = os.Getenv("CONFIG_LOCATION")
 )
 
 // READY YAML FILE FROM DISK
@@ -52,7 +54,7 @@ func LoadProfile(source, configLocation, configName string) (ipList map[string]I
 
 	// READ NetworkConfig FROM CR
 	case "cr":
-		retrievedConfig, err := GetNetworkConfig("networks-labul-2", "default")
+		retrievedConfig, err := GetNetworkConfig(configName, configLocation)
 		if err != nil {
 			log.Fatalf("Failed to get NetworkConfig: %v", err)
 		}

@@ -19,6 +19,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	port = ":50051"
+)
+
 type server struct {
 	ipservice.UnimplementedIpServiceServer
 }
@@ -28,6 +32,7 @@ var (
 	loadConfigFrom = os.Getenv("LOAD_CONFIG_FROM")
 	configName     = os.Getenv("CONFIG_NAME")
 	configLocation = os.Getenv("CONFIG_LOCATION")
+	serverPort     = os.Getenv("SERVER_PORT")
 )
 
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
@@ -37,40 +42,15 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 	logger.Info("COUNT IPs", logger.Args("", req.CountIpAddresses))
 	logger.Info("NETWORK KEY", logger.Args("", req.NetworkKey))
 
-	// switch loadConfigFrom {
-	// case "cr":
-	// 	// READ NetworkConfig FROM CR
-	// 	retrievedConfig, err := internal.GetNetworkConfig("networks-labul-2", "default")
-	// 	if err != nil {
-	// 		log.Fatalf("Failed to get NetworkConfig: %v", err)
-	// 	}
-	// 	fmt.Println("NETWORKS FROM CR:", retrievedConfig.Spec.Networks)
-	// 	ipList = internal.ConvertFromCRFormat(retrievedConfig.Spec.Networks)
-	// 	fmt.Println("NETWORKS CONVERT TO IPLIST FORMAT:", ipList)
-	// case "disk":
-	// 	// READ NetworkConfig FROM STATIC YAML FILE
-	// 	ipList = internal.LoadProfile(loadConfigFrom, configFilePath)
-	// 	fmt.Println("NETWORKS FROM STATIC YAML FILE:", ipList)
-	// default:
-	// 	log.Fatalf("INVALID LOAD_CONFIG_FROM VALUE: %s", loadConfigFrom)
-	// }
-
-	// READ NetworkConfig FROM CR
-	// retrievedConfig, err := internal.GetNetworkConfig("networks-labul-2", "default")
-	// if err != nil {
-	// 	log.Fatalf("Failed to get NetworkConfig: %v", err)
-	// }
-	// fmt.Println("NETWORKS FROM CR:", retrievedConfig.Spec.Networks)
-	// ipList := internal.ConvertFromCRFormat(retrievedConfig.Spec.Networks)
-	// fmt.Println("NETWORKS CONVERT TO IPLIST FORMAT:", ipList)
+	if serverPort == "" {
+		serverPort = port
+	} else {
+		serverPort = os.Getenv("SERVER_PORT")
+	}
 
 	// READ NetworkConfig FROM STATIC YAML FILE
 	ipList := internal.LoadProfile(loadConfigFrom, configLocation, configName)
 	fmt.Println("NETWORKS FROM STATC YAML FILE:", ipList)
-
-	// CONVERT TO CR FORMAT
-	// result := internal.ConvertToCRFormat(ipList)
-	// fmt.Println("NETWORKS CONVERT TO CR FORMAT:", result)
 
 	availableAddresses, err := internal.GenerateIPs(ipList, int(req.CountIpAddresses), req.NetworkKey)
 	if err != nil {
@@ -125,7 +105,7 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	}
 
 	fmt.Println(ipList)
-	status := fmt.Sprintf("Cluster %s set with IP range %s", req.ClusterName, req.IpAddressRange)
+	status := fmt.Sprintf("CLUSTER %s SET WITH IP RANGE %s", req.ClusterName, req.IpAddressRange)
 
 	// SAVE YAML FILE
 	switch loadConfigFrom {
@@ -147,16 +127,22 @@ func main() {
 	// PRINT BANNER + VERSION INFO
 	internal.PrintBanner()
 
-	lis, err := net.Listen("tcp", ":50051")
+	if serverPort == "" {
+		serverPort = port
+	} else {
+		serverPort = os.Getenv("SERVER_PORT")
+	}
+
+	lis, err := net.Listen("tcp", serverPort)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("FAILED TO LISTEN: %v", err)
 	}
 
 	s := grpc.NewServer()
 	ipservice.RegisterIpServiceServer(s, &server{})
 
-	log.Printf("server listening at %v", lis.Addr())
+	log.Printf("SERVER LISTENING AT %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatalf("FAILED TO SERVE: %v", err)
 	}
 }
