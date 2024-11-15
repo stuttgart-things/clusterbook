@@ -130,7 +130,7 @@ func main() {
 	if serverPort == "" {
 		serverPort = port
 	} else {
-		serverPort = os.Getenv("SERVER_PORT")
+		serverPort = ":" + os.Getenv("SERVER_PORT")
 	}
 
 	lis, err := net.Listen("tcp", serverPort)
