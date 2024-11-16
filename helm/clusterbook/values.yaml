@@ -5,7 +5,7 @@ test:
   name: clusterbook-grpc-smoketest
   serviceAddr: "clusterbook-service.clusterbook.svc.cluster.local:80"
   #value: "clusterbook.cd43.sthings-pve.labul.sva.de:443"
-  imageUrl: ghcr.io/stuttgart-things/clusterbook/clusterbook-5f3bb9105a15fafb0e52842968611a61@sha256
+  imageUrl: ghcr.io/stuttgart-things/clusterbook-client/client-62608e08adc29a8d6dbc9754e659f125@sha256
   imageTag: fd5772746a61d45389d0810a232748d6b3f63ecdb9e08340dad4029ac0167b46
   secureConnection: "false"
 
@@ -43,7 +43,7 @@ deployment:
       image: ghcr.io/stuttgart-things/clusterbook/clusterbook-5f3bb9105a15fafb0e52842968611a61@sha256
       replicaCount: 1
       imagePullPolicy: Always
-      tag: 693b8068912baa599b1725eb447912ff9b2ea208a1a896e7280e89cccfb90533
+      tag: ecc0b3bf8fdeabbe1c2ab664bbe22aa9c0adf7abe62fddd84a6ce9bf8a779e94
       securityContext:
         capabilities: {}
 
