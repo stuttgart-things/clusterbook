@@ -1,0 +1,29 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Values.test.name }}
+  annotations:
+    "helm.sh/hook": test
+  labels:
+    app: test-app
+spec:
+  containers:
+    - name: test
+      image: {{ .Values.test.image }}:{{ .Values.test.tag }}
+      env:
+        - name: CLUSTERBOOK_SERVER
+          value: "{{ .Values.test.serviceAddr }}"
+      resources: # Resource quotas to prevent overuse
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+      securityContext: # Security context to enforce good security practices
+        runAsUser: 1000 # Non-root user
+        runAsGroup: 1000
+        readOnlyRootFilesystem: true # Prevent modification of filesystem
+        allowPrivilegeEscalation: false # Reduce privilege escalation risks
+  restartPolicy: Never

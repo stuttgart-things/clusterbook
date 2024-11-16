@@ -38,6 +38,7 @@ tasks:
     deps: [build]
     cmds:
       - "go run tests/client/client.go"
+#helm test clusterbook -n clusterbook
 
   build:
     desc: Install
