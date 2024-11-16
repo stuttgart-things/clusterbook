@@ -43,7 +43,7 @@ deployment:
       image: ghcr.io/stuttgart-things/clusterbook/clusterbook-5f3bb9105a15fafb0e52842968611a61@sha256
       replicaCount: 1
       imagePullPolicy: Always
-      tag: ecc0b3bf8fdeabbe1c2ab664bbe22aa9c0adf7abe62fddd84a6ce9bf8a779e94
+      tag: bf9c1bff0308f0978e5cc1ef96a60e4a7e94fa92fe6923732d1ef035d4af70a9
       securityContext:
         capabilities: {}
 

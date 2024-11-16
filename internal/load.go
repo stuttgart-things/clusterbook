@@ -27,10 +27,8 @@ type NetworkConfigSpec struct {
 
 // CREATE THE CUSTOM RESOURCE GROUPVERSION
 var (
-	groupVersion   = schema.GroupVersion{Group: "github.stuttgart-things.com", Version: "v1"}
-	resource       = "networkconfigs"
-	configName     = os.Getenv("CONFIG_NAME")
-	configLocation = os.Getenv("CONFIG_LOCATION")
+	groupVersion = schema.GroupVersion{Group: "github.stuttgart-things.com", Version: "v1"}
+	resource     = "networkconfigs"
 )
 
 // READY YAML FILE FROM DISK

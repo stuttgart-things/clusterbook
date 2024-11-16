@@ -4,4 +4,4 @@ enableCertificateRequest: true
 ingressDomain: rke2.sthings-vsphere.labul.sva.de
 issuerKind: ClusterIssuer
 issuerName: vault-approle
-imageTag: ecc0b3bf8fdeabbe1c2ab664bbe22aa9c0adf7abe62fddd84a6ce9bf8a779e94
+imageTag: bf9c1bff0308f0978e5cc1ef96a60e4a7e94fa92fe6923732d1ef035d4af70a9
