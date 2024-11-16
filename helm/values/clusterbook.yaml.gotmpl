@@ -1,4 +1,9 @@
 ---
+deployment:
+  containers:
+    clusterbook:
+      tag: {{ .Values.imageTag}}
+
 {{ if .Values.enableCertificateRequest }}
 customresources:
   stagetime-ingress-certificate:
