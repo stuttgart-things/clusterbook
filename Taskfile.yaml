@@ -17,10 +17,21 @@ vars:
     sh: date -Ih
   GIT_COMMIT:
     sh: git log -n 1 --format=%h
+  PATH_HELMFILE: helm/helmfile.yaml
+  PATH_HELM_ENV: helm/env
+  K8S_ENV: dev
 
 dotenv: ['.env', '{{.HOME}}/.env']
 
 tasks:
+
+  deploy:
+    desc: Deploy to cluster
+    deps: [build-ko]
+    cmds:
+      - helmfile apply -f {{ .PATH_HELMFILE }} -e {{ .K8S_ENV }}
+      - helmfile test -f {{ .PATH_HELMFILE }} -e {{ .K8S_ENV }}
+
   run:
     desc: Run
     deps: [build]
@@ -62,6 +73,8 @@ tasks:
         sed -i "s|^\(\s*image:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $1}')|" {{ .CHART_DIR }}/{{ .PROJECT_NAME }}/values.yaml
         sed -i "s|^\(\s*tag:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')|" {{ .CHART_DIR }}//{{ .PROJECT_NAME }}/values.yaml
 
+        # UPDATE HELMFILE
+        yq eval ".imageTag = \"$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')\"" -i {{ .PATH_HELM_ENV }}/{{ .K8S_ENV }}.yaml
   proto:
     desc: Generate Go code from proto
     cmds:

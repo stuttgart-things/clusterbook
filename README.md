@@ -46,8 +46,12 @@ cat <<EOF > .env
 #CONFIG_NAME=config.yaml
 
 LOAD_CONFIG_FROM=cr
-CONFIG_LOCATION=default #namespace
-CONFIG_NAME=networks-labul-2 #resource-name
+CONFIG_LOCATION=clusterbook #namespace
+CONFIG_NAME=networks-labul #resource-name
+
+SERVER_PORT=50051
+CLUSTERBOOK_SERVER=localhost:50051
+SECURE_CONNECTION=false
 EOF
 ```
 

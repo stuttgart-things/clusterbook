@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"os"
@@ -9,11 +10,32 @@ import (
 
 	ipservice "github.com/stuttgart-things/clusterbook/ipservice"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 // READ CLUSTERBOOK_SERVER FROM ENV
-var clusterBookServer = os.Getenv("CLUSTERBOOK_SERVER")
+var (
+	secureConnection  = os.Getenv("SECURE_CONNECTION") // Read from env: "true" or "false"
+	clusterBookServer = os.Getenv("CLUSTERBOOK_SERVER")
+)
+
+func getCredentials() grpc.DialOption {
+	switch secureConnection {
+	case "true":
+		log.Println("Using secure gRPC connection")
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: true, // Adjust based on your security requirements
+		}
+		return grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))
+	case "false":
+		log.Println("Using insecure gRPC connection")
+		return grpc.WithTransportCredentials(insecure.NewCredentials())
+	default:
+		log.Fatalf("Invalid SECURE_CONNECTION value: %s. Expected 'true' or 'false'", secureConnection)
+		return nil // This will never be reached since log.Fatalf exits the program
+	}
+}
 
 func main() {
 	//nolint
@@ -60,8 +82,9 @@ func main() {
 }
 
 func GetIps(countIps int32, networkKey string) {
-	//nolint
-	conn, err := grpc.NewClient(clusterBookServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	// Select credentials based on secureConnection
+	conn, err := grpc.NewClient(clusterBookServer, getCredentials())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -89,7 +112,9 @@ func GetIps(countIps int32, networkKey string) {
 }
 
 func SetIpStatus(ips, clusterName string) {
-	conn, err := grpc.NewClient(clusterBookServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	// Select credentials based on secureConnection
+	conn, err := grpc.NewClient(clusterBookServer, getCredentials())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}

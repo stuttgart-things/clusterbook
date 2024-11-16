@@ -14,6 +14,8 @@ spec:
       env:
         - name: CLUSTERBOOK_SERVER
           value: "{{ .Values.test.serviceAddr }}"
+        - name: SECURE_CONNECTION
+          value: "{{ .Values.test.secureConnection }}"
       resources: # Resource quotas to prevent overuse
         limits:
           memory: "256Mi"

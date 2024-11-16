@@ -6,7 +6,8 @@ test:
   serviceAddr: "clusterbook-service.clusterbook.svc.cluster.local:80"
   #value: "clusterbook.cd43.sthings-pve.labul.sva.de:443"
   image: ghcr.io/stuttgart-things/clusterbook-client/client-62608e08adc29a8d6dbc9754e659f125@sha256
-  tag: c5fc63493d863854e5d68fc52c06c06a48e846ea09717a388106e6b2b455075e
+  tag: fd5772746a61d45389d0810a232748d6b3f63ecdb9e08340dad4029ac0167b46
+  secureConnection: "false"
 
 configmaps:
   homerun-demo-pitcher:

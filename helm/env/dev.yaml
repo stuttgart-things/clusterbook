@@ -1,0 +1,6 @@
+---
+enableIngress: true
+enableCertificateRequest: true
+ingressDomain: rke2.sthings-vsphere.labul.sva.de
+issuerKind: ClusterIssuer
+issuerName: vault-approle
