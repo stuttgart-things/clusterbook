@@ -16,6 +16,8 @@ gitops configuration service
 
 ## USAGE
 
+<details><summary>EXAMPLE CR</summary>
+
 ```bash
 kubectl apply -f - <<EOF
 ---
@@ -36,6 +38,8 @@ spec:
     - 4:pending:losangeles
 EOF
 ```
+
+</details>
 
 ## DEV TASKS
 
