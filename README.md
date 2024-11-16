@@ -12,6 +12,31 @@ gitops configuration service
   </p>
 </div>
 
+## DEPLOYMENT
+
+## USAGE
+
+```bash
+kubectl apply -f - <<EOF
+---
+apiVersion: github.stuttgart-things.com/v1
+kind: NetworkConfig
+metadata:
+  name: networks-labul
+  namespace: clusterbook
+spec:
+  networks:
+    10.31.103:
+    - "4"
+    - "5"
+    - 7:ASSIGNED:ipat
+    - 3:assigned:sandiego
+    10.31.104:
+    - "5"
+    - 4:pending:losangeles
+EOF
+```
+
 ## DEV TASKS
 
 ```bash
