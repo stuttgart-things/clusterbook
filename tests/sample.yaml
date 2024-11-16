@@ -3,7 +3,7 @@ apiVersion: github.stuttgart-things.com/v1
 kind: NetworkConfig
 metadata:
   name: networks-labul
-  namespace: default
+  namespace: clusterbook
 spec:
   networks:
     10.31.103:

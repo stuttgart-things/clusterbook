@@ -4,12 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	ipservice "github.com/stuttgart-things/clusterbook/ipservice"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+// READ CLUSTERBOOK_SERVER FROM ENV
+var clusterBookServer = os.Getenv("CLUSTERBOOK_SERVER")
 
 func main() {
 	//nolint
@@ -57,7 +61,7 @@ func main() {
 
 func GetIps(countIps int32, networkKey string) {
 	//nolint
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(clusterBookServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -85,7 +89,7 @@ func GetIps(countIps int32, networkKey string) {
 }
 
 func SetIpStatus(ips, clusterName string) {
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(clusterBookServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}

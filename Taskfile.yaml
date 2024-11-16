@@ -27,11 +27,17 @@ tasks:
     cmds:
       - "$GOPATH/bin/{{ .PROJECT_NAME }}"
 
+  build-client:
+    desc: Build client
+    deps: [proto]
+    cmds:
+      - dagger call -m ~/projects/dagger/go ko-build --src ./tests/client --token=env:GITHUB_TOKEN --repo "ghcr.io/{{ .ORGA_NAME }}/{{ .PROJECT_NAME }}-client" --progress plain
+
   run-client:
     desc: Run
     deps: [build]
     cmds:
-      - "go run tests/client.go"
+      - "go run tests/client/client.go"
 
   build:
     desc: Install
