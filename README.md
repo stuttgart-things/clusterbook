@@ -44,19 +44,20 @@ cat <<EOF > .env
 #LOAD_CONFIG_FROM=disk
 #CONFIG_LOCATION=tests
 #CONFIG_NAME=config.yaml
-
 LOAD_CONFIG_FROM=cr
 CONFIG_LOCATION=clusterbook #namespace
 CONFIG_NAME=networks-labul #resource-name
 
 SERVER_PORT=50051
-CLUSTERBOOK_SERVER=localhost:50051
-SECURE_CONNECTION=false
+
+#CLUSTERBOOK_SERVER=localhost:50051
+#SECURE_CONNECTION=false
+CLUSTERBOOK_SERVER=clusterbook.rke2.sthings-vsphere.labul.sva.de:443
+SECURE_CONNECTION=true
 EOF
 ```
 
 </details>
-
 
 ## LICENSE
 

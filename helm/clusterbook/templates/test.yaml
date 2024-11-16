@@ -10,7 +10,7 @@ metadata:
 spec:
   containers:
     - name: test
-      image: {{ .Values.test.image }}:{{ .Values.test.tag }}
+      image: {{ .Values.test.imageUrl }}:{{ .Values.test.imageTag }}
       env:
         - name: CLUSTERBOOK_SERVER
           value: "{{ .Values.test.serviceAddr }}"
