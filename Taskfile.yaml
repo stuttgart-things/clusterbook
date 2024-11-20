@@ -25,6 +25,18 @@ dotenv: ['.env', '{{.HOME}}/.env']
 
 tasks:
 
+  helm-push:
+    desc: Push helm chart
+    cmds:
+      - dagger call -m {{ .DAGGER_HELM_MODULE }}@{{ .DAGGER_HELM_MODULE_VERSION }} push --src {{ .CHART }} --progress plain --username {{ .USERNAME }} --password=env:GITHUB_TOKEN --registry {{ .PACKAGE_REGISTRY }} --repository {{ .REPOSITORY_NAME }}
+    vars:
+      DAGGER_HELM_MODULE: github.com/stuttgart-things/dagger/helm
+      DAGGER_HELM_MODULE_VERSION: v0.0.3
+      CHART: helm/clusterbook
+      PACKAGE_REGISTRY: ghcr.io
+      USERNAME: stuttgart-things
+      REPOSITORY_NAME: stuttgart-things/clusterbook
+
   deploy:
     desc: Deploy to cluster
     deps: [build-ko]
@@ -96,10 +108,10 @@ tasks:
     cmds:
       - dagger call -m github.com/felipecruz91/daggerverse/go build --source . --goVersion 1.23.1 -o build/
 
-  dagger-format:
-    desc: Format Golang w/ dagger
-    cmds:
-      - dagger call -m github.com/purpleclay/daggerverse/golang@1190a20046659b68001a6e16cd5c12fab960b216 --src . format export --path .
+  # dagger-format:
+  #   desc: Format Golang w/ dagger
+  #   cmds:
+  #     - dagger call -m github.com/purpleclay/daggerverse/golang@1190a20046659b68001a6e16cd5c12fab960b216 --src . format export --path .
 
   test:
     desc: Test code
@@ -142,7 +154,7 @@ tasks:
   pr:
     desc: Create pull request into main
     deps:
-      - dagger-format
+      # - dagger-format
       - dagger-lint
       - dagger-build
     cmds:
