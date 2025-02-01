@@ -1,6 +1,6 @@
 # stuttgart-things/clusterbook
 
-gitops configuration service
+gitops cluster configuration management
 
 <div align="center">
   <p>
@@ -13,6 +13,10 @@ gitops configuration service
 </div>
 
 ## DEPLOYMENT
+
+```bash
+helmfile apply -f helm/helmfile.yaml -e dev # example
+```
 
 ## USAGE
 
