@@ -120,7 +120,6 @@ tasks:
   #   desc: Format Golang w/ dagger
   #   cmds:
   #     - dagger call -m github.com/purpleclay/daggerverse/golang@1190a20046659b68001a6e16cd5c12fab960b216 --src . format export --path .
-
   test:
     desc: Test code
     cmds:
