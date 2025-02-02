@@ -33,7 +33,6 @@ token-precondition: &release
     msg: "Error: You are on the 'main' branch. Please switch to a different branch and try again."
 
 tasks:
-
   helm-push:
     desc: Push helm chart
     cmds:
