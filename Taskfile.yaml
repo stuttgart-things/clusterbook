@@ -180,7 +180,18 @@ tasks:
     deps: [lint]
     cmds:
       - task: commit
-      #- unset GITHUB_TOKEN &&   gh auth login --hostname GitHub.com -p https --web
+      - |
+        # Get a may existing pr number
+        PR_NUMBER=$(gh pr list | grep {{ .BRANCH }} | awk '{print $1}')
+
+        # Check if PR_NUMBER is a non-empty value (a number)
+        if [[ -n "$PR_NUMBER" && "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Closing PR #$PR_NUMBER..."
+            gh pr close "$PR_NUMBER"
+        else
+            echo "No matching PR found."
+        fi
+
       - gh pr create -t "{{ .BRANCH }}" -b "{{ .BRANCH }} branch into main"
       - sleep 20s
       - gh pr checks $(gh pr list | grep "^[^#;]" | grep '{{ .BRANCH }}' | awk '{print $1}') --watch
