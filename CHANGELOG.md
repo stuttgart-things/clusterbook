@@ -1,3 +1,14 @@
+## [1.1.1](https://github.com/stuttgart-things/clusterbook/compare/v1.1.0...v1.1.1) (2025-02-02)
+
+
+### Bug Fixes
+
+* **deps:** update module gopkg.in/yaml.v2 to v3 ([bb6808f](https://github.com/stuttgart-things/clusterbook/commit/bb6808f73eb340115ec61a856b77512bf3e35e43))
+* fix/update-release ([4011113](https://github.com/stuttgart-things/clusterbook/commit/40111135079f522e630b6d308979f8710eb1a4ab))
+* fix/update-release ([d3f14d3](https://github.com/stuttgart-things/clusterbook/commit/d3f14d3b0c3bab5701c615d59395ed9bb31c71c3))
+* fix/update-release ([e4975d5](https://github.com/stuttgart-things/clusterbook/commit/e4975d54af1a3f579e2d0610b05e2253c863e85d))
+* fix/update-release ([bfb2f49](https://github.com/stuttgart-things/clusterbook/commit/bfb2f49f5ef6f5545cc4892bb0cb63887dff6b7c))
+
 # [1.1.0](https://github.com/stuttgart-things/clusterbook/compare/v1.0.1...v1.1.0) (2025-02-02)
 
 
