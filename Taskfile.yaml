@@ -203,3 +203,4 @@ tasks:
       - npx semantic-release --dry-run
       - npx semantic-release --debug --no-ci
       - task: build-ko
+      - task: helm-push
