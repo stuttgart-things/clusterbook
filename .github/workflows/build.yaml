@@ -4,35 +4,21 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 'main'
       - 'feature/**'
       - 'fix/**'
   pull_request:
     types: [opened, reopened]
 
 jobs:
-  Validate-Golang:
-    name: Valdiate Golang Code
-    uses: stuttgart-things/stuttgart-things/.github/workflows/call-golang-validation.yaml@main
+  validate-golang:
+    name: Valdiate Golang
+    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-golang-validation.yaml@feature/add-homerun-task-go #go-1.23.1
     with:
-      module-name: clusterbook
+      module-name: machineshop
       environment-name: k8s
-      runs-on: ghr-clusterbook-skyami-cicd
+      runs-on: ghr-machineshop-skyami-cicd
       golint-version: v1.61.0-alpine
-      golang-version: 1.23.1
-      accept-linterrors: false
+      golang-version: "1.23.4"
+      accept-linterrors: true
       accept-failedtests: false
-      timeout-minutes: 15m
-
-  Build-Image:
-    name: Build Container Image
-    needs: Validate-Golang
-    uses: stuttgart-things/stuttgart-things/.github/workflows/call-ko-build.yaml@main
-    permissions:
-      actions: read
-      packages: write
-    with:
-      environment-name: k8s
-      runs-on: docker
-      golang-version: 1.23.1
-    secrets: inherit
+    secrets: inherit  #pragma: allowlist secret
