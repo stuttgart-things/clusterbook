@@ -5,7 +5,7 @@ go 1.23.1
 require (
 	github.com/fatih/color v1.17.0
 	github.com/pterm/pterm v0.12.79
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	go.hein.dev/go-version v0.1.0
 	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.36.4
