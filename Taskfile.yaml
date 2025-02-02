@@ -130,6 +130,7 @@ tasks:
 
   commit:
     desc: Commit + push code into branch
+    deos: [lint, test]
     cmds:
       - rm -rf dist/
       - git branch --set-upstream-to=origin/{{ .BRANCH }}
