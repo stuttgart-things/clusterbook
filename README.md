@@ -15,7 +15,7 @@ gitops cluster configuration management.
 ## DEPLOYMENT
 
 ```bash
-helmfile apply -f helm/helmfile.yaml -e dev # example
+helmfile apply -f helm/helmfile.yaml -e dev # example env
 ```
 
 ## USAGE
