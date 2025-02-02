@@ -181,7 +181,7 @@ tasks:
     cmds:
       - task: commit
       - |
-        # Get a may existing pr number
+        # Get an existing PR number (if any)
         PR_NUMBER=$(gh pr list | grep {{ .BRANCH }} | awk '{print $1}')
 
         # Check if PR_NUMBER is a non-empty value (a number)
