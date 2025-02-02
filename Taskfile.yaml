@@ -168,23 +168,21 @@ tasks:
 
   pr:
     desc: Create pull request into main
-    deps:
-      # - dagger-format
-      - dagger-lint
-      - dagger-build
+    deps: [lint]
     cmds:
       - task: commit
+      #- unset GITHUB_TOKEN &&   gh auth login --hostname GitHub.com -p https --web
       - gh pr create -t "{{ .BRANCH }}" -b "{{ .BRANCH }} branch into main"
       - sleep 20s
-      - gh pr checks $(gh pr list | grep "^[^#;]" | awk '{print $1}') --watch
-      - gh pr merge $(gh pr list | grep "^[^#;]" | awk '{print $1}') --auto --rebase --delete-branch
+      - gh pr checks $(gh pr list | grep "^[^#;]" | grep '{{ .BRANCH }}' | awk '{print $1}') --watch
+      - gh pr merge $(gh pr list | grep "^[^#;]" | grep '{{ .BRANCH }}' | awk '{print $1}') --auto --rebase --delete-branch
       - git checkout main && git pull
 
   release:
     desc: Release
     preconditions: *release
     deps:
-      - run
+      - build
     cmds:
       - task: commit
       - sleep 20s
@@ -194,5 +192,5 @@ tasks:
       - task: pr
       - npx semantic-release --dry-run
       - npx semantic-release --debug --no-ci
-      - task: goreleaser
-      - task: build-ko
+      #- task: goreleaser
+      #- task: build-ko
