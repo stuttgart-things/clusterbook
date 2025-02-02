@@ -179,7 +179,6 @@ tasks:
     desc: Create pull request into main
     deps: [lint]
     cmds:
-      - task: commit
       - |
         # Get an existing PR number (if any)
         PR_NUMBER=$(gh pr list | grep {{ .BRANCH }} | awk '{print $1}')
