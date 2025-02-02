@@ -192,5 +192,4 @@ tasks:
       - task: pr
       - npx semantic-release --dry-run
       - npx semantic-release --debug --no-ci
-      #- task: goreleaser
-      #- task: build-ko
+      - task: build-ko
