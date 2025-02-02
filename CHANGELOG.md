@@ -1,3 +1,12 @@
+## [1.0.1](https://github.com/stuttgart-things/clusterbook/compare/v1.0.0...v1.0.1) (2025-02-02)
+
+
+### Bug Fixes
+
+* fix/add-ko-build ([4135ae1](https://github.com/stuttgart-things/clusterbook/commit/4135ae1503be902636cf993913548a0c9fbf35cd))
+* fix/add-ko-build ([b47bdf3](https://github.com/stuttgart-things/clusterbook/commit/b47bdf3a223b51ecf66f947555d8953be292c1b1))
+* fix/add-ko-build ([38bfc2e](https://github.com/stuttgart-things/clusterbook/commit/38bfc2efdd8c9afee49386fc700ae841db758933))
+
 # 1.0.0 (2025-02-02)
 
 
