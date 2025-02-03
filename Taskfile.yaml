@@ -24,7 +24,6 @@ vars:
       [ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0)
 
 dotenv: ['.env', '{{.HOME}}/.env']
-
 # PRECONDITION TO CHECK IF TOKENS SET OR UNSET FOR RELEASE
 token-precondition: &release
   - sh: "[[ -n \"${GITHUB_TOKEN}\" ]]"
