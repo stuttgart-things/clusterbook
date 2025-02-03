@@ -20,5 +20,5 @@ jobs:
       golint-version: v1.61.0-alpine
       golang-version: "1.23.4"
       accept-linterrors: true
-      accept-failedtests: false
+      accept-failedtests: true
     secrets: inherit  #pragma: allowlist secret

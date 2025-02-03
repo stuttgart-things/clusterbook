@@ -113,7 +113,6 @@ tasks:
         sh: |
           [ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0)
 
-
   proto:
     desc: Generate Go code from proto
     cmds:
