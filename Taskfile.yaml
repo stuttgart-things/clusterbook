@@ -225,7 +225,6 @@ tasks:
           BRANCH: main
           RELEASE: "true"
       - task: helm-push
-      # PUSH UPDATED CHART
-      - |
+      - | # PUSH UPDATED CHART
         COMMIT_MESSAGE=$(echo updated for version $(git describe --tags --abbrev=0))
         git commit --allow-empty -a -m "$(echo ${COMMIT_MESSAGE})" && git push origin -u main
