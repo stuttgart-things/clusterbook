@@ -1,3 +1,11 @@
+## [1.2.2](https://github.com/stuttgart-things/clusterbook/compare/v1.2.1...v1.2.2) (2025-02-03)
+
+
+### Bug Fixes
+
+* fix/update-helm-version ([f5b56e3](https://github.com/stuttgart-things/clusterbook/commit/f5b56e3ee255d14eb654a128385126f9dc627523))
+* fix/update-helm-version ([21b8bdc](https://github.com/stuttgart-things/clusterbook/commit/21b8bdc83a0d98c4ff1a1b1ea0a18abd31cce452))
+
 ## [1.2.1](https://github.com/stuttgart-things/clusterbook/compare/v1.2.0...v1.2.1) (2025-02-03)
 
 
