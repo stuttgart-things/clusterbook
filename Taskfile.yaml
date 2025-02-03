@@ -92,7 +92,7 @@ tasks:
         echo ${BUILD_IMAGE}
         dagger call -m github.com/jpadams/daggerverse/trivy@v0.3.0 scan-image --image-ref ${BUILD_IMAGE}
 
-        # RELEASE
+        # BUILD FOR RELEASE
         {{ if eq .RELEASE "true" }}
         VERSION=$([ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0))
         skopeo copy --src-tls-verify=false --dest-tls-verify=false docker://${BUILD_IMAGE} docker://{{ .RELEASE_IMAGE }}:${VERSION}
