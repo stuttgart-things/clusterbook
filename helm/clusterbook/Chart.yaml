@@ -2,8 +2,8 @@ apiVersion: v2
 name: clusterbook
 description: A Helm chart for Kubernetes
 type: application
-version: v1.2.0-chart
-appVersion: v1.2.0
+version: dev-v1.2.0-chart
+appVersion: dev-v1.2.0
 dependencies:
   - name: sthings-helm-toolkit
     version: 2.4.74

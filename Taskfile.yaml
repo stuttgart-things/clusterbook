@@ -88,6 +88,7 @@ tasks:
     cmds:
       - |
         BUILD_IMAGE=$(ko build {{ .MODULE }} --image-label org.opencontainers.image.source=https://github.com/stuttgart-things/clusterbook --push)
+        VERSION={{ .VERSION }}
         echo ${BUILD_IMAGE}
         dagger call -m github.com/jpadams/daggerverse/trivy@v0.3.0 scan-image --image-ref ${BUILD_IMAGE}
 
@@ -101,8 +102,8 @@ tasks:
         # UPDATE HELM CHART
         sed -i "s|^\(\s*image:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $1}')|" {{ .CHART_DIR }}/{{ .PROJECT_NAME }}/values.yaml
         sed -i "s|^\(\s*tag:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')|" {{ .CHART_DIR }}//{{ .PROJECT_NAME }}/values.yaml
-        sed -i "s/^version: .*/version: {{ .VERSION }}-chart/" {{ .META_PATH }}
-        sed -i "s/^appVersion: .*/appVersion: {{ .VERSION }}/" {{ .META_PATH }}
+        sed -i "s/^version: .*/version: ${VERSION}-chart/" {{ .META_PATH }}
+        sed -i "s/^appVersion: .*/appVersion: ${VERSION}/" {{ .META_PATH }}
 
         # UPDATE HELMFILE
         yq eval ".imageTag = \"$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')\"" -i {{ .PATH_HELM_ENV }}/{{ .K8S_ENV }}.yaml
