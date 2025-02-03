@@ -82,7 +82,7 @@ tasks:
 
   build-ko:
     desc: Build image w/ KO
-    deps: [proto, lint, test, commit]
+    deps: [proto, lint, test]
     env:
       KO_DOCKER_REPO: ghcr.io/{{ .ORGA_NAME }}/{{ .PROJECT_NAME }}
     cmds:
@@ -221,6 +221,6 @@ tasks:
       - npx semantic-release --debug --no-ci
       - task: build-ko
         vars:
+          BRANCH: main
           RELEASE: "true"
-
       - task: helm-push
