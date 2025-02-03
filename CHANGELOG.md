@@ -1,3 +1,21 @@
+# [1.2.0](https://github.com/stuttgart-things/clusterbook/compare/v1.1.1...v1.2.0) (2025-02-03)
+
+
+### Bug Fixes
+
+* fix/release-task ([01f88d9](https://github.com/stuttgart-things/clusterbook/commit/01f88d93f4554fb8737cb2522021a60ffc26cf4f))
+* fix/release-task ([a5fbcbc](https://github.com/stuttgart-things/clusterbook/commit/a5fbcbc3ab2cc5f81979ab8fc4aa82a039e9e318))
+* main ([7b052ca](https://github.com/stuttgart-things/clusterbook/commit/7b052ca2a5ff209393fb1ba81fb47a16fadb6412))
+* main ([992b0fb](https://github.com/stuttgart-things/clusterbook/commit/992b0fb543a9ac86e5973fec4e9ef073c5404d12))
+
+
+### Features
+
+* main ([9f7ee5f](https://github.com/stuttgart-things/clusterbook/commit/9f7ee5f65cfd1e8e8528a545ca0a9d3d859428af))
+* main ([84c192b](https://github.com/stuttgart-things/clusterbook/commit/84c192b0f1f01b1afd7bb72540f4cf43ecc31d4a))
+* main ([e278dfa](https://github.com/stuttgart-things/clusterbook/commit/e278dfa5ab57dd3299589f80f2d808924dde37e2))
+* main ([22b232b](https://github.com/stuttgart-things/clusterbook/commit/22b232b952af976b3ef5561170f8781cb5b7a426))
+
 ## [1.1.1](https://github.com/stuttgart-things/clusterbook/compare/v1.1.0...v1.1.1) (2025-02-02)
 
 
