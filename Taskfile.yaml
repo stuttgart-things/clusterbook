@@ -41,7 +41,7 @@ tasks:
     cmds:
       - task: build-ko
         vars:
-          RELEASE: "true"
+          RELEASE: "false"
 
   helm-push:
     desc: Push helm chart
