@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/stuttgart-things/clusterbook/compare/v1.2.0...v1.2.1) (2025-02-03)
+
+
+### Bug Fixes
+
+* fix/ko-release-build ([a284b6b](https://github.com/stuttgart-things/clusterbook/commit/a284b6bb11c88f71610a0e36349a4e72581cad3a))
+
 # [1.2.0](https://github.com/stuttgart-things/clusterbook/compare/v1.1.1...v1.2.0) (2025-02-03)
 
 
