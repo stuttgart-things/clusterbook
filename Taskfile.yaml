@@ -40,6 +40,8 @@ tasks:
     desc: Run tests
     cmds:
       - task: build-ko
+        vars:
+          NAME: production
 
   helm-push:
     desc: Push helm chart
@@ -108,6 +110,8 @@ tasks:
 
         VERSION=$([ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0))
         skopeo copy --src-tls-verify=false --dest-tls-verify=false docker://${BUILD_IMAGE} docker://ghcr.io/stuttgart-things/clusterbook/clusterbook:${VERSION}
+
+        echo {{ .NAME }}
     vars:
       META_PATH: '{{ .CHART_DIR }}/{{ .PROJECT_NAME }}/Chart.yaml'
       VERSION:
