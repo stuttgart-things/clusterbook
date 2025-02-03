@@ -35,14 +35,6 @@ token-precondition: &release
     msg: "Error: You are on the 'main' branch. Please switch to a different branch and try again."
 
 tasks:
-
-  testss:
-    desc: Run tests
-    cmds:
-      - task: build-ko
-        vars:
-          RELEASE: "false"
-
   helm-push:
     desc: Push helm chart
     cmds:
@@ -99,6 +91,13 @@ tasks:
         echo ${BUILD_IMAGE}
         dagger call -m github.com/jpadams/daggerverse/trivy@v0.3.0 scan-image --image-ref ${BUILD_IMAGE}
 
+        # RELEASE
+        {{ if eq .RELEASE "true" }}
+        VERSION=$([ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0))
+        skopeo copy --src-tls-verify=false --dest-tls-verify=false docker://${BUILD_IMAGE} docker://{{ .RELEASE_IMAGE }}:${VERSION}
+        BUILD_IMAGE={{ .RELEASE_IMAGE }}:${VERSION}
+        {{ end }}
+
         # UPDATE HELM CHART
         sed -i "s|^\(\s*image:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $1}')|" {{ .CHART_DIR }}/{{ .PROJECT_NAME }}/values.yaml
         sed -i "s|^\(\s*tag:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')|" {{ .CHART_DIR }}//{{ .PROJECT_NAME }}/values.yaml
@@ -107,14 +106,9 @@ tasks:
 
         # UPDATE HELMFILE
         yq eval ".imageTag = \"$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')\"" -i {{ .PATH_HELM_ENV }}/{{ .K8S_ENV }}.yaml
-
-        # RELEASE
-        {{ if eq .RELEASE "true" }}
-        VERSION=$([ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0))
-        skopeo copy --src-tls-verify=false --dest-tls-verify=false docker://${BUILD_IMAGE} docker://ghcr.io/stuttgart-things/clusterbook/clusterbook:${VERSION}
-        {{ end }}
     vars:
       META_PATH: '{{ .CHART_DIR }}/{{ .PROJECT_NAME }}/Chart.yaml'
+      RELEASE_IMAGE: ghcr.io/stuttgart-things/clusterbook/clusterbook
       VERSION:
         sh: |
           [ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0)
@@ -227,7 +221,7 @@ tasks:
       - npx semantic-release --dry-run
       - npx semantic-release --debug --no-ci
       - task: build-ko
-        # vars:
-        #   ENV: production
+        vars:
+          RELEASE: "true"
 
       - task: helm-push
