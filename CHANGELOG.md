@@ -1,3 +1,16 @@
+# [1.3.0](https://github.com/stuttgart-things/clusterbook/compare/v1.2.2...v1.3.0) (2025-02-03)
+
+
+### Bug Fixes
+
+* fix/update-release-task ([f18c993](https://github.com/stuttgart-things/clusterbook/commit/f18c9931713af845ac19055387f428fdd36c6a5e))
+* fix/update-release-task ([2f28d73](https://github.com/stuttgart-things/clusterbook/commit/2f28d7396f39b018b87836bd9a53eebab7c8ba46))
+
+
+### Features
+
+* main ([f38fa9c](https://github.com/stuttgart-things/clusterbook/commit/f38fa9cdd80cd9f759c2f4ed923018f84610f4ab))
+
 ## [1.2.2](https://github.com/stuttgart-things/clusterbook/compare/v1.2.1...v1.2.2) (2025-02-03)
 
 
