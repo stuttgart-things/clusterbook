@@ -4,4 +4,4 @@ enableCertificateRequest: true
 ingressDomain: fluxdev-3.sthings-vsphere.labul.sva.de #rke2.sthings-vsphere.labul.sva.de
 issuerKind: ClusterIssuer
 issuerName: vault-approle
-imageTag: 1057d5ab65f9befc98660643e920e4b8c13410ed1d4e7901ba8f7163491f9e3f
+imageTag: d37a071f7ae3a10bd0161be8841ed15e028037dc61caa9beb9affd49fb93a08b

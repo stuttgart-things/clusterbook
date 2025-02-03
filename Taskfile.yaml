@@ -35,6 +35,12 @@ token-precondition: &release
     msg: "Error: You are on the 'main' branch. Please switch to a different branch and try again."
 
 tasks:
+
+  testss:
+    desc: Run tests
+    cmds:
+      - task: build-ko
+
   helm-push:
     desc: Push helm chart
     cmds:
@@ -216,4 +222,7 @@ tasks:
       - npx semantic-release --dry-run
       - npx semantic-release --debug --no-ci
       - task: build-ko
+        # vars:
+        #   ENV: production
+
       - task: helm-push
