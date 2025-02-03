@@ -99,6 +99,8 @@ tasks:
 
         # UPDATE HELMFILE
         yq eval ".imageTag = \"$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')\"" -i {{ .PATH_HELM_ENV }}/{{ .K8S_ENV }}.yaml
+
+        skopeo copy --src-tls-verify=false --dest-tls-verify=false docker://${BUILD_IMAGE} docker://{{ .RELEASE_IMAGE }}:${VERSION}
     vars:
       META_PATH: '{{ .CHART_DIR }}/{{ .PROJECT_NAME }}/Chart.yaml'
       VERSION:
