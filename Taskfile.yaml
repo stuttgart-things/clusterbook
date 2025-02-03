@@ -225,3 +225,7 @@ tasks:
           BRANCH: main
           RELEASE: "true"
       - task: helm-push
+      - |
+        COMMIT_MESSAGE=updated for version $([ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0))
+        git commit --allow-empty -a -m "$(echo ${COMMIT_MESSAGE})"
+        git push origin -u main
