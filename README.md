@@ -42,14 +42,16 @@ spec:
     - "5"
     - "6"
     - "7"
-    - 8:ASSIGNED:unknown     
+    - 8:ASSIGNED:unknown
     - "9"
     - "10"
     10.31.103:
     - 4:ASSIGNED:homerun-int2
+    - 5:ASSIGNED:labul-automation
+    - 6:ASSIGNED:labul-automation
     - "17"
     - "18"
-    - "19"
+    - 19:ASSIGNED:labul-automation
     - 8:ASSIGNED:fluxdev-3
     - 9:ASSIGNED:fluxdev-3
     - 16:ASSIGNED:homerun-dev
@@ -57,7 +59,7 @@ spec:
     - "5"
     - "6"
     - "7"
-    - "8"                    
+    - "8"
     - "9"
     - "10"
 EOF
