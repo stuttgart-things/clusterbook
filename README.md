@@ -32,14 +32,34 @@ metadata:
   namespace: clusterbook
 spec:
   networks:
-    10.31.103:
-    - "4"
+    10.31.101:
+    - 6:ASSIGNED:rahul-andre-rke2
+    - "7"
+    - "9"
+    - "10"
+    - 5:ASSIGNED:rancher-mgmt
+    10.31.102:
     - "5"
-    - 7:ASSIGNED:ipat
-    - 3:assigned:sandiego
+    - "6"
+    - "7"
+    - 8:ASSIGNED:unknown     
+    - "9"
+    - "10"
+    10.31.103:
+    - 4:ASSIGNED:homerun-int2
+    - "17"
+    - "18"
+    - "19"
+    - 8:ASSIGNED:fluxdev-3
+    - 9:ASSIGNED:fluxdev-3
+    - 16:ASSIGNED:homerun-dev
     10.31.104:
     - "5"
-    - 4:pending:losangeles
+    - "6"
+    - "7"
+    - "8"                    
+    - "9"
+    - "10"
 EOF
 ```
 
