@@ -1,3 +1,22 @@
+# [1.4.0](https://github.com/stuttgart-things/clusterbook/compare/v1.3.1...v1.4.0) (2025-03-11)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes packages to v0.32.2 ([c489a39](https://github.com/stuttgart-things/clusterbook/commit/c489a39f1d8989228caa6e1b9aa4430f9dde6d2c))
+* **deps:** update module google.golang.org/protobuf to v1.36.5 ([b15c75b](https://github.com/stuttgart-things/clusterbook/commit/b15c75b75301bbc92702c3e2b6b520eda5dcbea6))
+* **deps:** update module gopkg.in/yaml.v2 to v3 ([52a2d01](https://github.com/stuttgart-things/clusterbook/commit/52a2d01a74c34e20f26696bb97c983bc29ea90c5))
+* **deps:** update module gopkg.in/yaml.v2 to v3 ([8b6757a](https://github.com/stuttgart-things/clusterbook/commit/8b6757a2f151f7799811175b3d0ce67283417bd6))
+* **deps:** update module gopkg.in/yaml.v2 to v3 ([cfd7a67](https://github.com/stuttgart-things/clusterbook/commit/cfd7a676824b553d77fbef7af4efe72c9cc407dd))
+* fix/update-release ([685d91e](https://github.com/stuttgart-things/clusterbook/commit/685d91e316cfadc5cfc85c1670acc2d39e584e2f))
+
+
+### Features
+
+* feat/add-delete-request ([06e99b8](https://github.com/stuttgart-things/clusterbook/commit/06e99b82b1bb3a9ea29acd14d82bb40e371791e8))
+* feat/add-delete-request ([c2bb604](https://github.com/stuttgart-things/clusterbook/commit/c2bb604119bba83e38bfe04115958b40e0523f0c))
+* feat/add-delete-request ([f933084](https://github.com/stuttgart-things/clusterbook/commit/f9330843310f214d49c44f60588d7a9d8678063e))
+
 ## [1.3.1](https://github.com/stuttgart-things/clusterbook/compare/v1.3.0...v1.3.1) (2025-02-03)
 
 
