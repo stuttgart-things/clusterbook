@@ -9,8 +9,7 @@ require (
 	go.hein.dev/go-version v0.1.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.5
-	gopkg.in/yaml.v3 v3.0.1
-	gopkg.in/yaml.v3 v3.0.1
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.32.2
 	k8s.io/client-go v0.32.2
 )
@@ -52,6 +51,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241202173237-19429a94021a // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
