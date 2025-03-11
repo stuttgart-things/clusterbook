@@ -21,6 +21,7 @@ message IpResponse {
 message ClusterRequest {
   string ipAddressRange = 1;
   string clusterName = 2;
+  string status = 3; // Add this field
 }
 
 message ClusterResponse {

@@ -66,7 +66,6 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 		return &ipservice.IpResponse{IpAddressRange: ips}, nil
 	}
 }
-
 func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterRequest) (*ipservice.ClusterResponse, error) {
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
 	logger.Info("CONFIG FILE PATH", logger.Args("", configLocation+"/"+configName))
@@ -77,9 +76,8 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	// GET IPS FROM REQUEST
 	ips := strings.Split(req.IpAddressRange, ";")
 
-	// LOOP OVEER ips
+	// LOOP OVER ips
 	for _, ip := range ips {
-
 		// TRUNCATE IP
 		ipKey, err := internal.TruncateIP(ip)
 		if err != nil {
@@ -96,20 +94,18 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 		if entry.Status == "" {
 			logger.Info("IP WAS NOT SET", logger.Args("", ipKey+"."+ipDigit))
 		}
-		entry.Status = "ASSIGNED" // Modify the field
+		entry.Status = req.Status // Use the status from the request
 		entry.Cluster = req.ClusterName
 
 		ipList[ipKey][ipDigit] = entry // Reassign the modified struct back to the map
 		logger.Info("IP WAS ASSIGNED", logger.Args("", ipKey+"."+ipDigit))
-
 	}
 
 	fmt.Println(ipList)
-	status := fmt.Sprintf("CLUSTER %s SET WITH IP RANGE %s", req.ClusterName, req.IpAddressRange)
+	status := fmt.Sprintf("CLUSTER %s SET WITH IP RANGE %s AND STATUS %s", req.ClusterName, req.IpAddressRange, req.Status)
 
 	// SAVE YAML FILE
 	switch loadConfigFrom {
-
 	case "disk":
 		internal.SaveYAMLToDisk(ipList, configLocation+"/"+configName)
 	case "cr":
@@ -124,6 +120,7 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 }
 
 func main() {
+
 	// PRINT BANNER + VERSION INFO
 	internal.PrintBanner()
 
