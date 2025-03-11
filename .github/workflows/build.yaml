@@ -12,7 +12,7 @@ on:
 jobs:
   validate-golang:
     name: Valdiate Golang
-    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-golang-validation.yaml@feature/add-homerun-task-go #go-1.23.1
+    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-golang-validation.yaml@main #go-1.23.1
     with:
       module-name: machineshop
       environment-name: k8s
