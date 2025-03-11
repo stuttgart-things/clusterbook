@@ -9,6 +9,7 @@ import (
 	"time"
 
 	ipservice "github.com/stuttgart-things/clusterbook/ipservice"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"

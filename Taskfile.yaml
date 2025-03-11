@@ -34,6 +34,18 @@ token-precondition: &release
     msg: "Error: You are on the 'main' branch. Please switch to a different branch and try again."
 
 tasks:
+  do:
+    desc: Select a task to run
+    cmds:
+      - |
+        task=$(yq e '.tasks | keys' Taskfile.yaml | sed 's/^- //' | gum choose)
+        task ${task}
+
+  check:
+    desc: "Run pre-commit hooks"
+    cmds:
+      - pre-commit run -a
+
   helm-push:
     desc: Push helm chart
     cmds:
@@ -142,27 +154,32 @@ tasks:
 
   commit:
     desc: Commit + push code into branch
-    deps: [lint, test]
+    deps:
+      - check
     cmds:
-      - rm -rf dist/
       - git branch --set-upstream-to=origin/{{ .BRANCH }}
       - git pull
+      - git status
       - |
         git add *
+        git status
         if [[ -n $(git status --porcelain) ]]; then
-          echo "committing changes"
-          echo "ENTER COMMIT MESSAGE"
-          COMMIT_MESSAGE=$(echo $(gum choose "feat: {{ .BRANCH }}" "fix: {{ .BRANCH }}" "BREAKING CHANGE: {{ .BRANCH }}" "ENTER CUSTOM COMMIT MESSAGE"))
+          echo "Review the changes above."
+          gum confirm "Do you want to commit these changes?" || exit 0
 
-          if [ "$COMMIT_MESSAGE" == "ENTER CUSTOM COMMIT MESSAGE" ]; then
-            COMMIT_MESSAGE=$(echo $(gum input --placeholder "scope" --value "commit to {{ .BRANCH }}"))
+          echo "ENTER COMMIT MESSAGE"
+          COMMIT_MESSAGE=$(gum choose "CUSTOM MESSAGE" "feat: {{ .BRANCH }}" "fix: {{ .BRANCH }}" "BREAKING CHANGE: {{ .BRANCH }}")
+
+          if [ "$COMMIT_MESSAGE" == "CUSTOM MESSAGE" ]; then
+            CHANGED_FILES=$(git status --short | awk '{print $2}' | tr '\n' ' ')
+            COMMIT_MESSAGE=$(gum input --placeholder "Commit message" --value "Changed: $CHANGED_FILES")
           fi
 
-          git commit --allow-empty -a -m "$(echo ${COMMIT_MESSAGE})"
+          git commit --allow-empty -a -m "$COMMIT_MESSAGE"
         else
-          echo "no changes"
+          echo "No changes to commit."
         fi
-        git push origin -u {{ .BRANCH }}
+      - git push origin -u {{ .BRANCH }}
 
   branch:
     desc: Create branch from main
