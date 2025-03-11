@@ -2,5 +2,5 @@
 enableIngress: false
 enableCertificateRequest: false
 hostname: clusterbook
-tlsSecretName: clusterbook-ingress-tls
+tlsSecretName: clusterbook-ingress-tls # pragma: allowlist secret
 app: clusterbook

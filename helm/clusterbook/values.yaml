@@ -6,7 +6,7 @@ test:
   serviceAddr: "clusterbook-service.clusterbook.svc.cluster.local:80"
   #value: "clusterbook.cd43.sthings-pve.labul.sva.de:443"
   imageUrl: ghcr.io/stuttgart-things/clusterbook-client/client-62608e08adc29a8d6dbc9754e659f125@sha256
-  imageTag: fd5772746a61d45389d0810a232748d6b3f63ecdb9e08340dad4029ac0167b46
+  imageTag: fd5772746a61d45389d0810a232748d6b3f63ecdb9e08340dad4029ac0167b46 # pragma: allowlist secret
   secureConnection: "false"
 
 configmaps:
@@ -40,10 +40,10 @@ deployment:
       memory: 128Mi
   containers:
     clusterbook:
-      image: ghcr.io/stuttgart-things/clusterbook/clusterbook
+      image: ghcr.io/stuttgart-things/clusterbook/clusterbook-5f3bb9105a15fafb0e52842968611a61@sha256
       replicaCount: 1
       imagePullPolicy: Always
-      tag: v1.3.1
+      tag: bffec9f6a5bfe35959616809444e767be96bd6f4a124fd543c1b5738091b81f6 # pragma: allowlist secret
       securityContext:
         capabilities: {}
 
