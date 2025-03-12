@@ -40,10 +40,10 @@ deployment:
       memory: 128Mi
   containers:
     clusterbook:
-      image: ghcr.io/stuttgart-things/clusterbook/clusterbook-5f3bb9105a15fafb0e52842968611a61@sha256
+      image: ghcr.io/stuttgart-things/clusterbook/clusterbook
       replicaCount: 1
       imagePullPolicy: Always
-      tag: ab1ac7fb7873d31fe0fd2c2818b2beb7387e9c789b2b4c09626d72e1003355a7 # pragma: allowlist secret
+      tag: v1.5.0
       securityContext:
         capabilities: {}
 

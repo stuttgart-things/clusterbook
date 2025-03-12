@@ -4,4 +4,4 @@ enableCertificateRequest: true
 ingressDomain: 172.18.0.5.nip.io #rke2.sthings-vsphere.labul.sva.de
 issuerKind: ClusterIssuer
 issuerName: selfsigned
-imageTag: ab1ac7fb7873d31fe0fd2c2818b2beb7387e9c789b2b4c09626d72e1003355a7 # pragma: allowlist secret
+imageTag: v1.5.0 # pragma: allowlist secret
