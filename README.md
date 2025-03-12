@@ -20,7 +20,7 @@ helmfile apply -f helm/helmfile.yaml -e dev # example env
 
 ## USAGE
 
-<details><summary>EXAMPLE CR</summary>
+<details><summary>CREATE CR</summary>
 
 ```bash
 kubectl apply -f - <<EOF
@@ -63,6 +63,28 @@ spec:
     - "9"
     - "10"
 EOF
+```
+
+</details>
+
+<details><summary>CLI</summary>
+
+### GET IPS
+
+```bash
+machineshop get \
+--system=ips \
+--destination=localhost:50051 \
+--path=10.31.103 \
+--output=2
+```
+
+```bash
+machineshop push \
+--target=ips \
+--destination=clusterbook.rke2.sthings-vsphere.labul.sva.de:443 \
+--artifacts="10.31.103.9;10.31.103.10" \
+--assignee=app1
 ```
 
 </details>

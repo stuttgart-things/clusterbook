@@ -123,7 +123,7 @@ tasks:
       RELEASE_IMAGE: ghcr.io/stuttgart-things/clusterbook/clusterbook
       VERSION:
         sh: |
-          [ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0)
+          [ "$(git branch --show-current)" != "main" ] && echo "$(git describe --tags --abbrev=0)-dev" || echo $(git describe --tags --abbrev=0)
 
   proto:
     desc: Generate Go code from proto

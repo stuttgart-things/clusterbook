@@ -104,6 +104,9 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	fmt.Println(ipList)
 	status := fmt.Sprintf("CLUSTER %s SET WITH IP RANGE %s AND STATUS %s", req.ClusterName, req.IpAddressRange, req.Status)
 
+	// CONVERT THE STATUS TO UPPERCASE
+	status = strings.ToUpper(status)
+
 	// SAVE YAML FILE
 	switch loadConfigFrom {
 	case "disk":
