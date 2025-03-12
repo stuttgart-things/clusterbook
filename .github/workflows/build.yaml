@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - 'feature/**'
+      - 'feat/**'
       - 'fix/**'
   pull_request:
     types: [opened, reopened]
