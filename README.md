@@ -74,7 +74,7 @@ EOF
 ```bash
 machineshop get \
 --system=ips \
---destination=localhost:50051 \
+--destination=clusterbook.172.18.0.5.nip.io \
 --path=10.31.103 \
 --output=2
 ```
@@ -82,7 +82,7 @@ machineshop get \
 ```bash
 machineshop push \
 --target=ips \
---destination=clusterbook.rke2.sthings-vsphere.labul.sva.de:443 \
+--destination=clusterbook.172.18.0.5.nip.io \
 --artifacts="10.31.103.9;10.31.103.10" \
 --assignee=app1
 ```
