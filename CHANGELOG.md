@@ -1,3 +1,17 @@
+# [1.5.0](https://github.com/stuttgart-things/clusterbook/compare/v1.4.0...v1.5.0) (2025-03-12)
+
+
+### Bug Fixes
+
+* **deps:** update module gopkg.in/yaml.v2 to v2.2.8 [security] ([8baf5b7](https://github.com/stuttgart-things/clusterbook/commit/8baf5b74f89ef83176c1123d128bc0b800860d36))
+* feat/add-remove-func ([5387b91](https://github.com/stuttgart-things/clusterbook/commit/5387b91a0798939c48d671a05b81ec3c7694e3c4))
+* feat/add-remove-func ([e5f14b6](https://github.com/stuttgart-things/clusterbook/commit/e5f14b60559d6573e4f87f8ab5a4476237c7b9bc))
+
+
+### Features
+
+* feat/add-remove-func ([56a6c68](https://github.com/stuttgart-things/clusterbook/commit/56a6c68363f958b5c55de967fe427e8efe97340f))
+
 # [1.4.0](https://github.com/stuttgart-things/clusterbook/compare/v1.3.1...v1.4.0) (2025-03-11)
 
 
