@@ -1,7 +1,7 @@
 ---
 enableIngress: true
 enableCertificateRequest: true
-ingressDomain: fluxdev-3.sthings-vsphere.labul.sva.de #rke2.sthings-vsphere.labul.sva.de
+ingressDomain: 172.18.0.5.nip.io #rke2.sthings-vsphere.labul.sva.de
 issuerKind: ClusterIssuer
-issuerName: vault-approle
-imageTag: bffec9f6a5bfe35959616809444e767be96bd6f4a124fd543c1b5738091b81f6 # pragma: allowlist secret
+issuerName: selfsigned
+imageTag: ab1ac7fb7873d31fe0fd2c2818b2beb7387e9c789b2b4c09626d72e1003355a7 # pragma: allowlist secret

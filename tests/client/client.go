@@ -39,9 +39,10 @@ func getCredentials() grpc.DialOption {
 }
 
 func main() {
-
 	GetIps(2, "10.31.103")
 	SetIpStatus("10.31.103.7", "ipat", "reserved")
+	// DELETE RESERVATION
+	SetIpStatus("10.31.103.4", "", "")
 }
 
 func GetIps(countIps int32, networkKey string) {
