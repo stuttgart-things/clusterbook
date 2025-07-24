@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/stuttgart-things/clusterbook/compare/v1.5.0...v1.5.1) (2025-07-24)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes packages to v0.32.3 ([c54611d](https://github.com/stuttgart-things/clusterbook/commit/c54611d497777607c98f277d0e6e82b33be4e936))
+
 # [1.5.0](https://github.com/stuttgart-things/clusterbook/compare/v1.4.0...v1.5.0) (2025-03-12)
 
 
