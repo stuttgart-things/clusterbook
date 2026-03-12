@@ -6,6 +6,7 @@ package internal
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -37,7 +38,14 @@ func TestConvertToCRFormat(t *testing.T) {
 
 	result := ConvertToCRFormat(info)
 
-	// Vergleiche die Ergebnisse
+	// Sort slices before comparing since map iteration order is non-deterministic
+	for k := range result {
+		sort.Strings(result[k])
+	}
+	for k := range expected {
+		sort.Strings(expected[k])
+	}
+
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("Expected %v, but got %v", expected, result)
 	}
