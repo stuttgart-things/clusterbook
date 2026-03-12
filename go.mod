@@ -1,6 +1,6 @@
 module github.com/stuttgart-things/clusterbook
 
-go 1.24.0
+go 1.26.0
 
 require (
 	github.com/fatih/color v1.18.0
