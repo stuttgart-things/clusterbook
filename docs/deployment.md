@@ -21,7 +21,7 @@ Render and apply KCL manifests directly:
 cd kcl && kcl run | kubectl apply -f -
 
 # Custom image version
-kcl run -D config.image=ghcr.io/stuttgart-things/clusterbook/clusterbook:v1.5.1 \
+kcl run -D config.image=ghcr.io/stuttgart-things/clusterbook:v1.6.0 \
   | kubectl apply -f -
 
 # With HTTPRoute (Gateway API)

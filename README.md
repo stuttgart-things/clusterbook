@@ -36,7 +36,7 @@ cd kcl && kcl run
 ### Render with custom config
 
 ```bash
-kcl run -D config.image=ghcr.io/stuttgart-things/clusterbook/clusterbook:v1.5.1 \
+kcl run -D config.image=ghcr.io/stuttgart-things/clusterbook:v1.6.0 \
         -D config.namespace=clusterbook \
         -D config.configName=networks-labul
 ```
