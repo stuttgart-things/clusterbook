@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	port = ":50051"
+	port    = ":50051"
+	webPort = "8080"
 )
 
 type server struct {
@@ -33,6 +34,7 @@ var (
 	configName     = os.Getenv("CONFIG_NAME")
 	configLocation = os.Getenv("CONFIG_LOCATION")
 	serverPort     = os.Getenv("SERVER_PORT")
+	httpPort       = os.Getenv("HTTP_PORT")
 )
 
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
@@ -133,6 +135,13 @@ func main() {
 		serverPort = ":" + os.Getenv("SERVER_PORT")
 	}
 
+	if httpPort == "" {
+		httpPort = webPort
+	}
+
+	// START HTTP/HTMX SERVER IN BACKGROUND
+	go internal.StartWebServer(httpPort, loadConfigFrom, configLocation, configName)
+
 	lis, err := net.Listen("tcp", serverPort)
 	if err != nil {
 		log.Fatalf("FAILED TO LISTEN: %v", err)
@@ -141,7 +150,7 @@ func main() {
 	s := grpc.NewServer()
 	ipservice.RegisterIpServiceServer(s, &server{})
 
-	log.Printf("SERVER LISTENING AT %v", lis.Addr())
+	log.Printf("GRPC SERVER LISTENING AT %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("FAILED TO SERVE: %v", err)
 	}
