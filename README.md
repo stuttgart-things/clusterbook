@@ -57,14 +57,6 @@ cd kcl && kcl run | kubectl apply -f -
 
 </details>
 
-<details><summary>HELM (LEGACY)</summary>
-
-```bash
-helmfile apply -f helm/helmfile.yaml -e dev # example env
-```
-
-</details>
-
 ## USAGE
 
 <details><summary>WEB UI (HTMX)</summary>

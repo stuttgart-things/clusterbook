@@ -1,4 +1,0 @@
-{{- $envVar := . -}}
-{{- range $configmapName, $configmapTpl := .Values.configmaps -}}
-{{ include "sthings-helm-toolkit.configmap" (list $envVar $configmapName $configmapTpl) }}
-{{ end -}}
