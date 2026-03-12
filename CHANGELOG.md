@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/stuttgart-things/clusterbook/compare/v1.7.0...v1.8.0) (2026-03-12)
+
+
+### Features
+
+* full CRUD management via HTMX dashboard and REST API ([d8f35b4](https://github.com/stuttgart-things/clusterbook/commit/d8f35b4acc904b5ced0e25c741e9458533151802)), closes [#91](https://github.com/stuttgart-things/clusterbook/issues/91)
+
 # [1.7.0](https://github.com/stuttgart-things/clusterbook/compare/v1.6.1...v1.7.0) (2026-03-12)
 
 
