@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/stuttgart-things/clusterbook/compare/v1.8.0...v1.9.0) (2026-03-12)
+
+
+### Features
+
+* integrate PowerDNS API for automatic DNS record management ([#94](https://github.com/stuttgart-things/clusterbook/issues/94)) ([a432779](https://github.com/stuttgart-things/clusterbook/commit/a43277912e4d1d7d377f688d95e6dfe6854080d4)), closes [#93](https://github.com/stuttgart-things/clusterbook/issues/93)
+
 # [1.8.0](https://github.com/stuttgart-things/clusterbook/compare/v1.7.0...v1.8.0) (2026-03-12)
 
 
