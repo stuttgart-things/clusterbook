@@ -42,6 +42,12 @@ schema ClusterBook:
     httpRouteHostname: str = ""
     httpRouteAnnotations: {str:str} = {}
 
+    # PowerDNS integration
+    pdnsEnabled: bool = False
+    pdnsURL: str = ""
+    pdnsToken: str = ""
+    pdnsZone: str = ""
+
     # RBAC
     networkConfigApiGroup: str = "github.stuttgart-things.com"
 

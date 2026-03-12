@@ -35,6 +35,10 @@ var (
 	configLocation = os.Getenv("CONFIG_LOCATION")
 	serverPort     = os.Getenv("SERVER_PORT")
 	httpPort       = os.Getenv("HTTP_PORT")
+	pdnsEnabled    = os.Getenv("PDNS_ENABLED")
+	pdnsURL        = os.Getenv("PDNS_URL")
+	pdnsToken      = os.Getenv("PDNS_TOKEN")
+	pdnsZone       = os.Getenv("PDNS_ZONE")
 )
 
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
@@ -139,8 +143,11 @@ func main() {
 		httpPort = webPort
 	}
 
+	// INIT PDNS CLIENT (nil if not enabled)
+	pdns := internal.NewPDNSClient(pdnsEnabled, pdnsURL, pdnsToken, pdnsZone)
+
 	// START HTTP/HTMX SERVER IN BACKGROUND
-	go internal.StartWebServer(httpPort, loadConfigFrom, configLocation, configName)
+	go internal.StartWebServer(httpPort, loadConfigFrom, configLocation, configName, pdns)
 
 	lis, err := net.Listen("tcp", serverPort)
 	if err != nil {
