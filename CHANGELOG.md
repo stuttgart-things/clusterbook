@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/stuttgart-things/clusterbook/compare/v1.6.0...v1.6.1) (2026-03-12)
+
+
+### Bug Fixes
+
+* update container image path to ghcr.io/stuttgart-things/clusterbook ([e6a049d](https://github.com/stuttgart-things/clusterbook/commit/e6a049d1536ccdae054b0f49b616f469cf948fa9))
+
 # [1.6.0](https://github.com/stuttgart-things/clusterbook/compare/v1.5.0...v1.6.0) (2026-03-12)
 
 
