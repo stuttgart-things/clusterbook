@@ -1,3 +1,23 @@
+# [1.6.0](https://github.com/stuttgart-things/clusterbook/compare/v1.5.0...v1.6.0) (2026-03-12)
+
+
+### Bug Fixes
+
+* add write permissions to release workflow ([f746e1f](https://github.com/stuttgart-things/clusterbook/commit/f746e1f22ffa85b9d6ad20d3d881785f90bfde9f))
+* **deps:** update all dependencies and remove genproto replace directive ([b798471](https://github.com/stuttgart-things/clusterbook/commit/b798471ef890bb23e13745546ccadf20a8ff7ac9)), closes [#79](https://github.com/stuttgart-things/clusterbook/issues/79)
+* **deps:** update kubernetes packages to v0.32.3 ([c54611d](https://github.com/stuttgart-things/clusterbook/commit/c54611d497777607c98f277d0e6e82b33be4e936))
+* **deps:** update module gopkg.in/yaml.v2 to v2.4.0 ([c023035](https://github.com/stuttgart-things/clusterbook/commit/c0230356198a1844f4599cfaa00a2d418af2e21f))
+* remove repositoryUrl from .releaserc to use Dagger-rewritten git remote ([9ab4ca9](https://github.com/stuttgart-things/clusterbook/commit/9ab4ca9a6ed71b34e527efc7a803bb69db46a975))
+
+
+### Features
+
+* add HTMX frontend, REST API, and update to Go 1.26 ([8319abf](https://github.com/stuttgart-things/clusterbook/commit/8319abf7de863524a4d42f368b10262b3f14e974)), closes [#77](https://github.com/stuttgart-things/clusterbook/issues/77) [#78](https://github.com/stuttgart-things/clusterbook/issues/78)
+* add KCL manifests and update README with REST/HTMX docs ([d993289](https://github.com/stuttgart-things/clusterbook/commit/d99328964ae308bbf9dd5272c297a80753912b0c)), closes [#82](https://github.com/stuttgart-things/clusterbook/issues/82)
+* add KCL README, remove Helm chart, fix probes for deploy ([e4d3090](https://github.com/stuttgart-things/clusterbook/commit/e4d309032f883ebd8edf6f03e66a9724b5a96783))
+* add KO image build and release workflows ([608e6d2](https://github.com/stuttgart-things/clusterbook/commit/608e6d24aa066854c440a2d6e32a4ff128a1acba))
+* add TechDocs, Backstage catalog, and pages workflow ([f1a333e](https://github.com/stuttgart-things/clusterbook/commit/f1a333e6fe3e94296dd9d4aa31ddfbb7f786da06))
+
 ## [1.5.1](https://github.com/stuttgart-things/clusterbook/compare/v1.5.0...v1.5.1) (2025-07-24)
 
 
