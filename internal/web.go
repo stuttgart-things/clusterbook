@@ -32,7 +32,7 @@ type IPEntry struct {
 }
 
 // StartWebServer starts the HTTP server for HTMX frontend and REST API
-func StartWebServer(httpPort, loadFrom, configLoc, configNm string) {
+func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
 	mux := http.NewServeMux()
 
 	// HTMX frontend routes
@@ -51,10 +51,10 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string) {
 		handleAPINetworkIPs(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("POST /api/v1/networks/{key}/assign", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIAssign(w, r, loadFrom, configLoc, configNm)
+		handleAPIAssign(w, r, loadFrom, configLoc, configNm, pdns)
 	})
 	mux.HandleFunc("POST /api/v1/networks/{key}/release", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIRelease(w, r, loadFrom, configLoc, configNm)
+		handleAPIRelease(w, r, loadFrom, configLoc, configNm, pdns)
 	})
 
 	// REST API CRUD routes
@@ -73,10 +73,10 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string) {
 
 	// HTMX partial routes
 	mux.HandleFunc("POST /htmx/assign", func(w http.ResponseWriter, r *http.Request) {
-		handleHTMXAssign(w, r, loadFrom, configLoc, configNm)
+		handleHTMXAssign(w, r, loadFrom, configLoc, configNm, pdns)
 	})
 	mux.HandleFunc("POST /htmx/release", func(w http.ResponseWriter, r *http.Request) {
-		handleHTMXRelease(w, r, loadFrom, configLoc, configNm)
+		handleHTMXRelease(w, r, loadFrom, configLoc, configNm, pdns)
 	})
 	mux.HandleFunc("POST /htmx/add-network", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXAddNetwork(w, r, loadFrom, configLoc, configNm)
@@ -176,7 +176,7 @@ func handleNetworkDetail(w http.ResponseWriter, r *http.Request, loadFrom, confi
 	}
 }
 
-func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -212,6 +212,7 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	ipList[ipKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
+	pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
 
 	// Re-render the network detail table
 	ips := ipList[networkKey]
@@ -223,7 +224,7 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	}{networkKey, entries})
 }
 
-func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -247,11 +248,13 @@ func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	}
 
 	entry := ipList[ipKey][ipDigit]
+	prevCluster := entry.Cluster
 	entry.Status = ""
 	entry.Cluster = ""
 	ipList[ipKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
+	pdns.DeleteRecord(prevCluster)
 
 	// Re-render the network detail table
 	ips := ipList[networkKey]
@@ -288,7 +291,7 @@ func handleAPINetworkIPs(w http.ResponseWriter, r *http.Request, loadFrom, confi
 	json.NewEncoder(w).Encode(entries)
 }
 
-func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
 	networkKey := r.PathValue("key")
 
 	var req struct {
@@ -330,6 +333,7 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	ipList[networkKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
+	pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -338,7 +342,7 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	})
 }
 
-func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
 	networkKey := r.PathValue("key")
 
 	var req struct {
@@ -364,11 +368,13 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	}
 
 	entry := ipList[networkKey][ipDigit]
+	prevCluster := entry.Cluster
 	entry.Status = ""
 	entry.Cluster = ""
 	ipList[networkKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
+	pdns.DeleteRecord(prevCluster)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
