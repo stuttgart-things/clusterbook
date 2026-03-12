@@ -4,6 +4,7 @@ Imports all resources and exports manifests
 """
 
 import manifests as k8s_manifests
+import crd
 import namespace
 import serviceaccount
 import configmap
@@ -15,6 +16,7 @@ import httproute
 # Export all manifests as a YAML stream (filter out None values)
 _manifests = [
     m for m in [
+        crd.networkConfigCRD
         namespace.namespace
         serviceaccount.serviceAccount
         configmap.configMap
