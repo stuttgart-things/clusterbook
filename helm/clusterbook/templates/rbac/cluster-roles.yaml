@@ -1,4 +1,0 @@
-{{- $envVar := . -}}
-{{- range $clusterRoleName, $clusterRole := .Values.clusterRoles -}}
-{{ include "sthings-helm-toolkit.cluster-role" (list $envVar $clusterRoleName $clusterRole) }}
-{{ end -}}

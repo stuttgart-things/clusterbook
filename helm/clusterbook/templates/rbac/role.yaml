@@ -1,4 +1,0 @@
-{{- $envVar := . -}}
-{{- range $roleName, $role := .Values.roles -}}
-{{ include "sthings-helm-toolkit.role" (list $envVar $roleName $role) }}
-{{ end -}}

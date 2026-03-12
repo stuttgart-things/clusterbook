@@ -67,9 +67,8 @@ deployment = {
                             }
                         }
                         livenessProbe: {
-                            httpGet: {
-                                path: "/"
-                                port: "http"
+                            tcpSocket: {
+                                port: "grpc"
                             }
                             initialDelaySeconds: 10
                             periodSeconds: 10
@@ -77,9 +76,8 @@ deployment = {
                             failureThreshold: 3
                         }
                         readinessProbe: {
-                            httpGet: {
-                                path: "/"
-                                port: "http"
+                            tcpSocket: {
+                                port: "grpc"
                             }
                             initialDelaySeconds: 5
                             periodSeconds: 5

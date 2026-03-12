@@ -3,6 +3,7 @@ Main entry point for clusterbook Kubernetes deployment
 Imports all resources and exports manifests
 """
 
+import manifests as k8s_manifests
 import namespace
 import serviceaccount
 import configmap
@@ -11,8 +12,8 @@ import service
 import rbac
 import httproute
 
-# Export all manifests (filter out None values)
-manifests = [
+# Export all manifests as a YAML stream (filter out None values)
+_manifests = [
     m for m in [
         namespace.namespace
         serviceaccount.serviceAccount
@@ -25,3 +26,5 @@ manifests = [
         httproute.httproute
     ] if m
 ]
+
+k8s_manifests.yaml_stream(_manifests)
