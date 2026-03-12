@@ -1,6 +1,5 @@
 {
   "branches": ["main"],
-  "repositoryUrl": "https://github.com/stuttgart-things/clusterbook",
   "tagFormat": "v${version}",
   "plugins": [
     [
