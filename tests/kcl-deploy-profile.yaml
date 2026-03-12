@@ -1,0 +1,5 @@
+---
+config.namespace: clusterbook
+config.configName: networks-labul
+config.loadConfigFrom: cr
+config.configLocation: clusterbook
