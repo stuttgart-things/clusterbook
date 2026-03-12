@@ -1,0 +1,8 @@
+site_name: Clusterbook
+site_description: GitOps cluster IP address management for Kubernetes
+nav:
+  - Home: index.md
+  - Deployment: deployment.md
+  - CI/CD: cicd.md
+plugins:
+  - techdocs-core
