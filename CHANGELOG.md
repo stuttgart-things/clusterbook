@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/stuttgart-things/clusterbook/compare/v1.6.1...v1.7.0) (2026-03-12)
+
+
+### Features
+
+* add NetworkConfig CRD to KCL manifests ([1600a62](https://github.com/stuttgart-things/clusterbook/commit/1600a62d7ccf752ec7614fcda509df005e6f486a))
+
 ## [1.6.1](https://github.com/stuttgart-things/clusterbook/compare/v1.6.0...v1.6.1) (2026-03-12)
 
 
