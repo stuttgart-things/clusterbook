@@ -1,0 +1,25 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: clusterbook
+  description: GitOps-based IP address management service for Kubernetes clusters with gRPC, REST API, and HTMX dashboard
+  annotations:
+    github.com/project-slug: stuttgart-things/clusterbook
+    backstage.io/techdocs-ref: url:https://github.com/stuttgart-things/clusterbook/tree/main
+    backstage.io/source-location: url:https://github.com/stuttgart-things/clusterbook
+  tags:
+    - ipam
+    - grpc
+    - golang
+    - kubernetes
+    - htmx
+  links:
+    - url: https://github.com/stuttgart-things/clusterbook
+      title: GitHub Repository
+      icon: github
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: sthings
