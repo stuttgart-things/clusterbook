@@ -57,12 +57,38 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string) {
 		handleAPIRelease(w, r, loadFrom, configLoc, configNm)
 	})
 
+	// REST API CRUD routes
+	mux.HandleFunc("POST /api/v1/networks", func(w http.ResponseWriter, r *http.Request) {
+		handleAPICreateNetwork(w, r, loadFrom, configLoc, configNm)
+	})
+	mux.HandleFunc("DELETE /api/v1/networks/{key}", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIDeleteNetwork(w, r, loadFrom, configLoc, configNm)
+	})
+	mux.HandleFunc("POST /api/v1/networks/{key}/ips/add", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIAddIP(w, r, loadFrom, configLoc, configNm)
+	})
+	mux.HandleFunc("DELETE /api/v1/networks/{key}/ips/{ip}", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIDeleteIP(w, r, loadFrom, configLoc, configNm)
+	})
+
 	// HTMX partial routes
 	mux.HandleFunc("POST /htmx/assign", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXAssign(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("POST /htmx/release", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXRelease(w, r, loadFrom, configLoc, configNm)
+	})
+	mux.HandleFunc("POST /htmx/add-network", func(w http.ResponseWriter, r *http.Request) {
+		handleHTMXAddNetwork(w, r, loadFrom, configLoc, configNm)
+	})
+	mux.HandleFunc("POST /htmx/add-ip", func(w http.ResponseWriter, r *http.Request) {
+		handleHTMXAddIP(w, r, loadFrom, configLoc, configNm)
+	})
+	mux.HandleFunc("POST /htmx/delete-ip", func(w http.ResponseWriter, r *http.Request) {
+		handleHTMXDeleteIP(w, r, loadFrom, configLoc, configNm)
+	})
+	mux.HandleFunc("POST /htmx/delete-network", func(w http.ResponseWriter, r *http.Request) {
+		handleHTMXDeleteNetwork(w, r, loadFrom, configLoc, configNm)
 	})
 
 	log.Printf("HTTP/HTMX SERVER LISTENING AT :%s", httpPort)
@@ -351,6 +377,270 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	})
 }
 
+// --- REST API CRUD Handlers ---
+
+func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	var req struct {
+		Network string   `json:"network"`
+		IPs     []string `json:"ips"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.Network == "" || len(req.IPs) == 0 {
+		http.Error(w, `{"error":"network and ips are required"}`, http.StatusBadRequest)
+		return
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	if _, exists := ipList[req.Network]; exists {
+		http.Error(w, `{"error":"network already exists"}`, http.StatusConflict)
+		return
+	}
+
+	ipList[req.Network] = make(IPs)
+	for _, ip := range req.IPs {
+		ipList[req.Network][ip] = IPInfo{}
+	}
+
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": fmt.Sprintf("Network %s created with %d IPs", req.Network, len(req.IPs)),
+	})
+}
+
+func handleAPIDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	networkKey := r.PathValue("key")
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	if _, ok := ipList[networkKey]; !ok {
+		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
+		return
+	}
+
+	delete(ipList, networkKey)
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": fmt.Sprintf("Network %s deleted", networkKey),
+	})
+}
+
+func handleAPIAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	networkKey := r.PathValue("key")
+
+	var req struct {
+		IPs []string `json:"ips"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if len(req.IPs) == 0 {
+		http.Error(w, `{"error":"ips array is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	if _, ok := ipList[networkKey]; !ok {
+		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
+		return
+	}
+
+	added := 0
+	for _, ip := range req.IPs {
+		if _, exists := ipList[networkKey][ip]; !exists {
+			ipList[networkKey][ip] = IPInfo{}
+			added++
+		}
+	}
+
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": fmt.Sprintf("Added %d IPs to network %s", added, networkKey),
+	})
+}
+
+func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	networkKey := r.PathValue("key")
+	ip := r.PathValue("ip")
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	network, ok := ipList[networkKey]
+	if !ok {
+		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
+		return
+	}
+
+	if _, exists := network[ip]; !exists {
+		http.Error(w, `{"error":"ip not found"}`, http.StatusNotFound)
+		return
+	}
+
+	delete(ipList[networkKey], ip)
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": fmt.Sprintf("IP %s.%s deleted", networkKey, ip),
+	})
+}
+
+// --- HTMX CRUD Handlers ---
+
+func handleHTMXAddNetwork(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	network := r.FormValue("network")
+	ipFrom := r.FormValue("ip_from")
+	ipTo := r.FormValue("ip_to")
+
+	if network == "" || ipFrom == "" || ipTo == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	from, err := strconv.Atoi(ipFrom)
+	if err != nil {
+		http.Error(w, "Invalid IP range start", http.StatusBadRequest)
+		return
+	}
+	to, err := strconv.Atoi(ipTo)
+	if err != nil {
+		http.Error(w, "Invalid IP range end", http.StatusBadRequest)
+		return
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	if _, exists := ipList[network]; exists {
+		http.Error(w, "Network already exists", http.StatusConflict)
+		return
+	}
+
+	ipList[network] = make(IPs)
+	for i := from; i <= to; i++ {
+		ipList[network][strconv.Itoa(i)] = IPInfo{}
+	}
+
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	// Redirect to the new network's detail page
+	w.Header().Set("HX-Redirect", "/network/"+network)
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleHTMXAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	networkKey := r.FormValue("network_key")
+	ip := r.FormValue("ip")
+
+	if networkKey == "" || ip == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	if _, ok := ipList[networkKey]; !ok {
+		http.Error(w, "Network not found", http.StatusNotFound)
+		return
+	}
+
+	if _, exists := ipList[networkKey][ip]; exists {
+		http.Error(w, "IP already exists", http.StatusConflict)
+		return
+	}
+
+	ipList[networkKey][ip] = IPInfo{}
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	// Re-render the IP table
+	entries := getIPEntries(ipList[networkKey], networkKey)
+	tmpl := template.Must(template.New("table").Parse(ipTablePartial))
+	tmpl.Execute(w, struct {
+		NetworkKey string
+		Entries    []IPEntry
+	}{networkKey, entries})
+}
+
+func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	networkKey := r.FormValue("network_key")
+	ip := r.FormValue("ip")
+
+	if networkKey == "" || ip == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	ipDigit, err := GetLastIPDigit(ip)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	delete(ipList[networkKey], ipDigit)
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	// Re-render the IP table
+	entries := getIPEntries(ipList[networkKey], networkKey)
+	tmpl := template.Must(template.New("table").Parse(ipTablePartial))
+	tmpl.Execute(w, struct {
+		NetworkKey string
+		Entries    []IPEntry
+	}{networkKey, entries})
+}
+
+func handleHTMXDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	networkKey := r.FormValue("network_key")
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	delete(ipList, networkKey)
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	// Redirect to dashboard
+	w.Header().Set("HX-Redirect", "/")
+	w.WriteHeader(http.StatusOK)
+}
+
 // saveConfig persists the IP list based on the configured backend
 func saveConfig(ipList map[string]IPs, loadFrom, configLoc, configNm string) {
 	switch loadFrom {
@@ -398,6 +688,15 @@ const dashboardTemplate = `<!DOCTYPE html>
         .bar-pending { background: #facc15; }
         .bar-available { background: #4ade80; }
         .total-badge { display: inline-block; background: #334155; color: #94a3b8; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; margin-top: 0.5rem; }
+        .add-card { background: #1e293b; border-radius: 12px; padding: 1.5rem; border: 2px dashed #334155; display: flex; align-items: center; justify-content: center; min-height: 180px; cursor: pointer; transition: border-color 0.2s; }
+        .add-card:hover { border-color: #6366f1; }
+        .add-form { width: 100%; }
+        .add-form input { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.875rem; width: 100%; margin-bottom: 0.5rem; }
+        .add-form .row { display: flex; gap: 0.5rem; }
+        .add-form .row input { width: 50%; }
+        .btn-add { background: #4f46e5; color: white; padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 600; width: 100%; }
+        .btn-add:hover { background: #6366f1; }
+        .add-label { color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.25rem; }
     </style>
 </head>
 <body>
@@ -432,6 +731,19 @@ const dashboardTemplate = `<!DOCTYPE html>
                 </a>
             </div>
             {{end}}
+            <div class="add-card">
+                <form class="add-form" hx-post="/htmx/add-network" hx-swap="none">
+                    <div class="card-title" style="text-align: center; margin-bottom: 1rem;">+ Add Network</div>
+                    <div class="add-label">Subnet prefix (e.g. 10.31.105)</div>
+                    <input type="text" name="network" placeholder="10.31.105" required>
+                    <div class="add-label">IP range (last octet)</div>
+                    <div class="row">
+                        <input type="number" name="ip_from" placeholder="From" min="1" max="254" required>
+                        <input type="number" name="ip_to" placeholder="To" min="1" max="254" required>
+                    </div>
+                    <button type="submit" class="btn-add">Create Network</button>
+                </form>
+            </div>
         </div>
     </div>
 </body>
@@ -472,6 +784,12 @@ const networkDetailTemplate = `<!DOCTYPE html>
         .form-inline select { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; }
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: inline; }
+        .toolbar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+        .toolbar input { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; width: 80px; }
+        .btn-add-ip { background: #4f46e5; color: white; padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.75rem; font-weight: 600; }
+        .btn-add-ip:hover { background: #6366f1; }
+        .btn-danger { background: #991b1b; color: white; padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.75rem; font-weight: 600; margin-left: auto; }
+        .btn-danger:hover { background: #b91c1c; }
     </style>
 </head>
 <body>
@@ -486,7 +804,20 @@ const networkDetailTemplate = `<!DOCTYPE html>
                 <a href="/network/{{.NetworkKey}}" {{if eq $.NetworkKey .NetworkKey}}class="active"{{end}}>{{.NetworkKey}}.x</a>
                 {{end}}
             </div>
-            <div id="ip-table">` + ipTablePartial + `</div>
+            <div>
+                <div class="toolbar">
+                    <form class="form-inline" hx-post="/htmx/add-ip" hx-target="#ip-table" hx-swap="innerHTML">
+                        <input type="hidden" name="network_key" value="{{.NetworkKey}}">
+                        <input type="text" name="ip" placeholder="Last octet" required style="width: 90px;">
+                        <button type="submit" class="btn-add-ip">+ Add IP</button>
+                    </form>
+                    <form hx-post="/htmx/delete-network" hx-swap="none" hx-confirm="Delete network {{.NetworkKey}}? This cannot be undone.">
+                        <input type="hidden" name="network_key" value="{{.NetworkKey}}">
+                        <button type="submit" class="btn-danger">Delete Network</button>
+                    </form>
+                </div>
+                <div id="ip-table">` + ipTablePartial + `</div>
+            </div>
         </div>
     </div>
 </body>
@@ -513,6 +844,7 @@ const ipTablePartial = `<table>
             </td>
             <td>{{if .Cluster}}{{.Cluster}}{{else}}<span style="color: #475569;">—</span>{{end}}</td>
             <td>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
                 {{if or (eq .Status "ASSIGNED") (eq .Status "PENDING")}}
                 <form class="form-inline" hx-post="/htmx/release" hx-target="#ip-table" hx-swap="innerHTML">
                     <input type="hidden" name="ip" value="{{.IP}}">
@@ -531,6 +863,12 @@ const ipTablePartial = `<table>
                     <button type="submit" class="btn btn-assign">Assign</button>
                 </form>
                 {{end}}
+                <form hx-post="/htmx/delete-ip" hx-target="#ip-table" hx-swap="innerHTML" hx-confirm="Remove {{.IP}} from this network?">
+                    <input type="hidden" name="ip" value="{{.IP}}">
+                    <input type="hidden" name="network_key" value="{{$.NetworkKey}}">
+                    <button type="submit" class="btn btn-release" style="font-size: 0.65rem; padding: 0.3rem 0.5rem;">&#x2715;</button>
+                </form>
+                </div>
             </td>
         </tr>
         {{end}}
