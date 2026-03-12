@@ -120,7 +120,7 @@ tasks:
         yq eval ".imageTag = \"$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')\"" -i {{ .PATH_HELM_ENV }}/{{ .K8S_ENV }}.yaml
     vars:
       META_PATH: '{{ .CHART_DIR }}/{{ .PROJECT_NAME }}/Chart.yaml'
-      RELEASE_IMAGE: ghcr.io/stuttgart-things/clusterbook/clusterbook
+      RELEASE_IMAGE: ghcr.io/stuttgart-things/clusterbook
       VERSION:
         sh: |
           [ "$(git branch --show-current)" != "main" ] && echo "$(git describe --tags --abbrev=0)-dev" || echo $(git describe --tags --abbrev=0)

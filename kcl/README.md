@@ -16,7 +16,7 @@ dagger call -m github.com/stuttgart-things/dagger/kcl@v0.82.0 run \
 # render with inline parameters
 dagger call -m github.com/stuttgart-things/dagger/kcl@v0.82.0 run \
   --source kcl \
-  --parameters 'config.image=ghcr.io/stuttgart-things/clusterbook/clusterbook:v1.5.1,config.namespace=clusterbook' \
+  --parameters 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.6.0,config.namespace=clusterbook' \
   export --path /tmp/rendered-clusterbook.yaml
 ```
 
@@ -24,7 +24,7 @@ dagger call -m github.com/stuttgart-things/dagger/kcl@v0.82.0 run \
 
 ```bash
 kcl run kcl/main.k \
-  -D 'config.image=ghcr.io/stuttgart-things/clusterbook/clusterbook:v1.5.1' \
+  -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.6.0' \
   -D 'config.namespace=clusterbook'
 ```
 
@@ -35,7 +35,7 @@ kcl run kcl/main.k \
 cd kcl && kcl run | kubectl apply -f -
 
 # or with custom config
-kcl run -D 'config.image=ghcr.io/stuttgart-things/clusterbook/clusterbook:v1.5.1' \
+kcl run -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.6.0' \
         -D 'config.configName=networks-labul' \
   | kubectl apply -f -
 ```
@@ -55,7 +55,7 @@ kcl run -D 'config.httpRouteEnabled=true' \
 |---|---|---|
 | `config.name` | `clusterbook` | Resource name |
 | `config.namespace` | `clusterbook` | Target namespace |
-| `config.image` | `ghcr.io/stuttgart-things/clusterbook/clusterbook:latest` | Container image |
+| `config.image` | `ghcr.io/stuttgart-things/clusterbook:v1.6.0` | Container image |
 | `config.imagePullPolicy` | `Always` | Image pull policy |
 | `config.replicas` | `1` | Replica count |
 | `config.grpcPort` | `50051` | gRPC container port |
@@ -86,7 +86,7 @@ kcl run -D 'config.httpRouteEnabled=true' \
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook/clusterbook:v1.5.1
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.6.0
 config.namespace: clusterbook
 config.configName: networks-labul
 ```
@@ -95,7 +95,7 @@ config.configName: networks-labul
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook/clusterbook:v1.5.1
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.6.0
 config.namespace: clusterbook-dev
 config.loadConfigFrom: disk
 config.configLocation: /config
@@ -106,7 +106,7 @@ config.configName: config.yaml
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook/clusterbook:v1.5.1
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.6.0
 config.namespace: clusterbook
 config.configName: networks-labul
 config.httpRouteEnabled: true

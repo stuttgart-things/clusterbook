@@ -10,7 +10,7 @@ schema ClusterBook:
     namespace: str = "clusterbook"
 
     # Image
-    image: str = "ghcr.io/stuttgart-things/clusterbook/clusterbook:latest"
+    image: str = "ghcr.io/stuttgart-things/clusterbook:v1.6.0"
     imagePullPolicy: str = "Always"
 
     # Replicas and resources
