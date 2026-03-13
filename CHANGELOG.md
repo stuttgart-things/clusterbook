@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/stuttgart-things/clusterbook/compare/v1.12.1...v1.13.0) (2026-03-13)
+
+
+### Features
+
+* add inline edit for IP assignments in web UI ([cf00f8a](https://github.com/stuttgart-things/clusterbook/commit/cf00f8a120e461ed501945bf5c844bb7fafbe546))
+
 ## [1.12.1](https://github.com/stuttgart-things/clusterbook/compare/v1.12.0...v1.12.1) (2026-03-13)
 
 
