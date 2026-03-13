@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/stuttgart-things/clusterbook/compare/v1.16.0...v1.17.0) (2026-03-13)
+
+
+### Features
+
+* add CIDR-aware IP allocation ([326d22d](https://github.com/stuttgart-things/clusterbook/commit/326d22d2aac994b08e315e4e69bff3bbcb92058b)), closes [#70](https://github.com/stuttgart-things/clusterbook/issues/70)
+
 # [1.16.0](https://github.com/stuttgart-things/clusterbook/compare/v1.15.0...v1.16.0) (2026-03-13)
 
 
