@@ -703,12 +703,27 @@ const dashboardTemplate = `<!DOCTYPE html>
         .btn-add { background: #4f46e5; color: white; padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 600; width: 100%; }
         .btn-add:hover { background: #6366f1; }
         .add-label { color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.25rem; }
+        .banner { text-align: center; margin-bottom: 2rem; padding: 1.5rem 0; position: relative; overflow: hidden; }
+        .banner pre { font-family: 'Courier New', monospace; font-size: 0.55rem; line-height: 1.1; color: #ff6600; font-weight: bold; display: inline-block; text-align: left; text-shadow: 0 0 10px rgba(255,102,0,0.5), 0 0 20px rgba(255,102,0,0.2); }
+        .banner .scanline { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px); pointer-events: none; }
+        .banner .glow { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse at center, rgba(255,102,0,0.06) 0%, transparent 70%); pointer-events: none; }
+        .banner-sub { color: #ff9900; font-size: 0.875rem; letter-spacing: 0.3em; text-transform: uppercase; margin-top: 0.5rem; font-family: 'Courier New', monospace; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Clusterbook</h1>
-        <p class="subtitle">IP Address Management Dashboard</p>
+        <div class="banner">
+            <div class="glow"></div>
+            <pre>
+ ██████╗██╗     ██╗   ██╗███████╗████████╗███████╗██████╗ ██████╗  ██████╗  ██████╗ ██╗  ██╗
+██╔════╝██║     ██║   ██║██╔════╝╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔═══██╗██╔═══██╗██║ ██╔╝
+██║     ██║     ██║   ██║███████╗   ██║   █████╗  ██████╔╝██████╔╝██║   ██║██║   ██║█████╔╝
+██║     ██║     ██║   ██║╚════██║   ██║   ██╔══╝  ██╔══██╗██╔══██╗██║   ██║██║   ██║██╔═██╗
+╚██████╗███████╗╚██████╔╝███████║   ██║   ███████╗██║  ██║██████╔╝╚██████╔╝╚██████╔╝██║  ██╗
+ ╚═════╝╚══════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝</pre>
+            <div class="banner-sub">IP Address Management</div>
+            <div class="scanline"></div>
+        </div>
         <div class="grid">
             {{range .}}
             <div class="card">
@@ -796,10 +811,26 @@ const networkDetailTemplate = `<!DOCTYPE html>
         .btn-add-ip:hover { background: #6366f1; }
         .btn-danger { background: #991b1b; color: white; padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.75rem; font-weight: 600; margin-left: auto; }
         .btn-danger:hover { background: #b91c1c; }
+        .banner { text-align: center; margin-bottom: 1.5rem; padding: 1rem 0; position: relative; overflow: hidden; }
+        .banner pre { font-family: 'Courier New', monospace; font-size: 0.4rem; line-height: 1.1; color: #ff6600; font-weight: bold; display: inline-block; text-align: left; text-shadow: 0 0 10px rgba(255,102,0,0.5), 0 0 20px rgba(255,102,0,0.2); }
+        .banner .scanline { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px); pointer-events: none; }
+        .banner .glow { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse at center, rgba(255,102,0,0.06) 0%, transparent 70%); pointer-events: none; }
+        .banner a { text-decoration: none; }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="banner">
+            <div class="glow"></div>
+            <a href="/"><pre>
+ ██████╗██╗     ██╗   ██╗███████╗████████╗███████╗██████╗ ██████╗  ██████╗  ██████╗ ██╗  ██╗
+██╔════╝██║     ██║   ██║██╔════╝╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔═══██╗██╔═══██╗██║ ██╔╝
+██║     ██║     ██║   ██║███████╗   ██║   █████╗  ██████╔╝██████╔╝██║   ██║██║   ██║█████╔╝
+██║     ██║     ██║   ██║╚════██║   ██║   ██╔══╝  ██╔══██╗██╔══██╗██║   ██║██║   ██║██╔═██╗
+╚██████╗███████╗╚██████╔╝███████║   ██║   ███████╗██║  ██║██████╔╝╚██████╔╝╚██████╔╝██║  ██╗
+ ╚═════╝╚══════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝</pre></a>
+            <div class="scanline"></div>
+        </div>
         <div class="header">
             <a href="/" class="back">&larr;</a>
             <h1>{{.NetworkKey}}.x</h1>
