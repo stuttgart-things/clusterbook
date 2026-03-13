@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/stuttgart-things/clusterbook/compare/v1.11.0...v1.12.0) (2026-03-13)
+
+
+### Features
+
+* make PowerDNS DNS record creation optional per IP assignment ([0fa3c06](https://github.com/stuttgart-things/clusterbook/commit/0fa3c064441957858eb8d90ae3c85c943f45016e)), closes [#100](https://github.com/stuttgart-things/clusterbook/issues/100)
+
 # [1.11.0](https://github.com/stuttgart-things/clusterbook/compare/v1.10.1...v1.11.0) (2026-03-13)
 
 
