@@ -55,7 +55,13 @@ deployment = {
                                     name: "{}-config".format(config.name)
                                 }
                             }
-                        ]
+                        ] + ([
+                            {
+                                secretRef: {
+                                    name: "{}-pdns".format(config.name)
+                                }
+                            }
+                        ] if config.pdnsEnabled else [])
                         resources: {
                             requests: {
                                 cpu: config.cpuRequest

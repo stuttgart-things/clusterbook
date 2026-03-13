@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 // NetworkPoolInfo holds summary info for a network pool
@@ -71,6 +72,14 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleAPIDeleteIP(w, r, loadFrom, configLoc, configNm)
 	})
 
+	// Cluster info routes
+	mux.HandleFunc("GET /api/v1/clusters", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIClusters(w, r, loadFrom, configLoc, configNm)
+	})
+	mux.HandleFunc("GET /api/v1/clusters/{name}", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIClusterInfo(w, r, loadFrom, configLoc, configNm)
+	})
+
 	// HTMX partial routes
 	mux.HandleFunc("POST /htmx/assign", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXAssign(w, r, loadFrom, configLoc, configNm, pdns)
@@ -103,10 +112,10 @@ func getPoolInfos(ipList map[string]IPs) []NetworkPoolInfo {
 	for key, ips := range ipList {
 		info := NetworkPoolInfo{NetworkKey: key, Total: len(ips)}
 		for _, ipInfo := range ips {
-			switch ipInfo.Status {
-			case "ASSIGNED":
+			switch {
+			case strings.HasPrefix(ipInfo.Status, "ASSIGNED"):
 				info.Assigned++
-			case "PENDING":
+			case strings.HasPrefix(ipInfo.Status, "PENDING"):
 				info.Pending++
 			default:
 				info.Available++
@@ -170,7 +179,7 @@ func handleNetworkDetail(w http.ResponseWriter, r *http.Request, loadFrom, confi
 		Pools      []NetworkPoolInfo
 	}{networkKey, entries, pools}
 
-	tmpl := template.Must(template.New("network").Parse(networkDetailTemplate))
+	tmpl := template.Must(template.New("network").Funcs(TemplateFuncs()).Parse(networkDetailTemplate))
 	if err := tmpl.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -186,6 +195,7 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	cluster := r.FormValue("cluster")
 	status := r.FormValue("status")
 	networkKey := r.FormValue("network_key")
+	createDNS := r.FormValue("create_dns") == "on"
 
 	if ip == "" || cluster == "" || status == "" {
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
@@ -208,16 +218,22 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 
 	entry := ipList[ipKey][ipDigit]
 	entry.Status = status
+	if createDNS {
+		entry.Status = status + ":DNS"
+	}
 	entry.Cluster = cluster
 	ipList[ipKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
-	pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
+
+	if createDNS {
+		pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
+	}
 
 	// Re-render the network detail table
 	ips := ipList[networkKey]
 	entries := getIPEntries(ips, networkKey)
-	tmpl := template.Must(template.New("table").Parse(ipTablePartial))
+	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
 	tmpl.Execute(w, struct {
 		NetworkKey string
 		Entries    []IPEntry
@@ -249,17 +265,21 @@ func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configL
 
 	entry := ipList[ipKey][ipDigit]
 	prevCluster := entry.Cluster
+	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
 	entry.Status = ""
 	entry.Cluster = ""
 	ipList[ipKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
-	pdns.DeleteRecord(prevCluster)
+
+	if hadDNS {
+		pdns.DeleteRecord(prevCluster)
+	}
 
 	// Re-render the network detail table
 	ips := ipList[networkKey]
 	entries := getIPEntries(ips, networkKey)
-	tmpl := template.Must(template.New("table").Parse(ipTablePartial))
+	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
 	tmpl.Execute(w, struct {
 		NetworkKey string
 		Entries    []IPEntry
@@ -295,9 +315,10 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	networkKey := r.PathValue("key")
 
 	var req struct {
-		IP      string `json:"ip"`
-		Cluster string `json:"cluster"`
-		Status  string `json:"status"`
+		IP        string `json:"ip"`
+		Cluster   string `json:"cluster"`
+		Status    string `json:"status"`
+		CreateDNS bool   `json:"create_dns"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -329,11 +350,17 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 
 	entry := ipList[networkKey][ipDigit]
 	entry.Status = req.Status
+	if req.CreateDNS {
+		entry.Status = req.Status + ":DNS"
+	}
 	entry.Cluster = req.Cluster
 	ipList[networkKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
-	pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
+
+	if req.CreateDNS {
+		pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -369,12 +396,16 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 
 	entry := ipList[networkKey][ipDigit]
 	prevCluster := entry.Cluster
+	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
 	entry.Status = ""
 	entry.Cluster = ""
 	ipList[networkKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
-	pdns.DeleteRecord(prevCluster)
+
+	if hadDNS {
+		pdns.DeleteRecord(prevCluster)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -511,6 +542,73 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	})
 }
 
+// --- Cluster Info Handlers ---
+
+func handleAPIClusters(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	clusters := map[string][]map[string]string{}
+	for networkKey, ips := range ipList {
+		for ipDigit, entry := range ips {
+			if entry.Cluster != "" {
+				clusters[entry.Cluster] = append(clusters[entry.Cluster], map[string]string{
+					"network": networkKey,
+					"ip":      networkKey + "." + ipDigit,
+					"status":  entry.Status,
+				})
+			}
+		}
+	}
+
+	type clusterSummary struct {
+		Cluster string `json:"cluster"`
+		IPCount int    `json:"ip_count"`
+	}
+
+	result := []clusterSummary{}
+	for name, ips := range clusters {
+		result = append(result, clusterSummary{Cluster: name, IPCount: len(ips)})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func handleAPIClusterInfo(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	clusterName := r.PathValue("name")
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	type ipInfo struct {
+		Network string `json:"network"`
+		IP      string `json:"ip"`
+		Status  string `json:"status"`
+	}
+
+	var ips []ipInfo
+	for networkKey, network := range ipList {
+		for ipDigit, entry := range network {
+			if entry.Cluster == clusterName {
+				ips = append(ips, ipInfo{
+					Network: networkKey,
+					IP:      networkKey + "." + ipDigit,
+					Status:  entry.Status,
+				})
+			}
+		}
+	}
+
+	if len(ips) == 0 {
+		http.Error(w, `{"error":"cluster not found"}`, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"cluster": clusterName,
+		"ips":     ips,
+	})
+}
+
 // --- HTMX CRUD Handlers ---
 
 func handleHTMXAddNetwork(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
@@ -589,7 +687,7 @@ func handleHTMXAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 
 	// Re-render the IP table
 	entries := getIPEntries(ipList[networkKey], networkKey)
-	tmpl := template.Must(template.New("table").Parse(ipTablePartial))
+	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
 	tmpl.Execute(w, struct {
 		NetworkKey string
 		Entries    []IPEntry
@@ -623,7 +721,7 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 
 	// Re-render the IP table
 	entries := getIPEntries(ipList[networkKey], networkKey)
-	tmpl := template.Must(template.New("table").Parse(ipTablePartial))
+	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
 	tmpl.Execute(w, struct {
 		NetworkKey string
 		Entries    []IPEntry
@@ -856,15 +954,15 @@ const ipTablePartial = `<table>
         <tr>
             <td style="font-family: monospace;">{{.IP}}</td>
             <td>
-                {{if eq .Status "ASSIGNED"}}<span class="badge badge-assigned">ASSIGNED</span>
-                {{else if eq .Status "PENDING"}}<span class="badge badge-pending">PENDING</span>
+                {{if hasPrefix .Status "ASSIGNED"}}<span class="badge badge-assigned">ASSIGNED</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span>{{end}}
+                {{else if hasPrefix .Status "PENDING"}}<span class="badge badge-pending">PENDING</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span>{{end}}
                 {{else}}<span class="badge badge-available">AVAILABLE</span>
                 {{end}}
             </td>
             <td>{{if .Cluster}}{{.Cluster}}{{else}}<span style="color: #475569;">—</span>{{end}}</td>
             <td>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                {{if or (eq .Status "ASSIGNED") (eq .Status "PENDING")}}
+                {{if or (hasPrefix .Status "ASSIGNED") (hasPrefix .Status "PENDING")}}
                 <form class="form-inline" hx-post="/htmx/release" hx-target="#ip-table" hx-swap="innerHTML">
                     <input type="hidden" name="ip" value="{{.IP}}">
                     <input type="hidden" name="network_key" value="{{$.NetworkKey}}">
@@ -879,6 +977,7 @@ const ipTablePartial = `<table>
                         <option value="ASSIGNED">ASSIGNED</option>
                         <option value="PENDING">PENDING</option>
                     </select>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: #94a3b8; cursor: pointer;"><input type="checkbox" name="create_dns" style="accent-color: #6366f1;"> DNS</label>
                     <button type="submit" class="btn btn-assign">Assign</button>
                 </form>
                 {{end}}
@@ -912,5 +1011,7 @@ func TemplateFuncs() template.FuncMap {
 		"mul": func(a float64, b float64) float64 {
 			return a * b
 		},
+		"hasPrefix": strings.HasPrefix,
+		"hasSuffix": strings.HasSuffix,
 	}
 }

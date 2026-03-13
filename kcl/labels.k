@@ -16,6 +16,10 @@ _httpRouteParentRefName = option("config.httpRouteParentRefName")
 _httpRouteParentRefNamespace = option("config.httpRouteParentRefNamespace")
 _httpRouteHostname = option("config.httpRouteHostname")
 _httpRouteAnnotations = option("config.httpRouteAnnotations") or {}
+_pdnsEnabled = option("config.pdnsEnabled")
+_pdnsURL = option("config.pdnsURL")
+_pdnsToken = option("config.pdnsToken")
+_pdnsZone = option("config.pdnsZone")
 
 # Config instance with command-line overrides
 config: schema.ClusterBook = schema.ClusterBook {
@@ -41,6 +45,14 @@ config: schema.ClusterBook = schema.ClusterBook {
         httpRouteHostname = _httpRouteHostname
     if _httpRouteAnnotations:
         httpRouteAnnotations = _httpRouteAnnotations
+    if _pdnsEnabled:
+        pdnsEnabled = _pdnsEnabled in [True, "True", "true"]
+    if _pdnsURL:
+        pdnsURL = _pdnsURL
+    if _pdnsToken:
+        pdnsToken = _pdnsToken
+    if _pdnsZone:
+        pdnsZone = _pdnsZone
 }
 
 # Common labels applied to all resources

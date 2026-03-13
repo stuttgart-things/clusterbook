@@ -22,7 +22,6 @@ configMap = {
         HTTP_PORT: str(config.httpPort)
         PDNS_ENABLED: str(config.pdnsEnabled).lower()
         PDNS_URL: config.pdnsURL
-        PDNS_TOKEN: config.pdnsToken
         PDNS_ZONE: config.pdnsZone
     }
 }
