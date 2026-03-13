@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/stuttgart-things/clusterbook/compare/v1.15.0...v1.16.0) (2026-03-13)
+
+
+### Features
+
+* add unit tests for cluster info REST endpoints ([cb621e8](https://github.com/stuttgart-things/clusterbook/commit/cb621e877117451f86333d4c5d9210797287f255)), closes [#97](https://github.com/stuttgart-things/clusterbook/issues/97)
+
 # [1.15.0](https://github.com/stuttgart-things/clusterbook/compare/v1.14.0...v1.15.0) (2026-03-13)
 
 
