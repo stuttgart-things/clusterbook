@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/stuttgart-things/clusterbook/compare/v1.13.0...v1.14.0) (2026-03-13)
+
+
+### Features
+
+* delete DNS records when IPs are removed ([0e576c8](https://github.com/stuttgart-things/clusterbook/commit/0e576c807725a933a8f67ed6635df2ce9630cc55)), closes [#102](https://github.com/stuttgart-things/clusterbook/issues/102)
+
 # [1.13.0](https://github.com/stuttgart-things/clusterbook/compare/v1.12.1...v1.13.0) (2026-03-13)
 
 
