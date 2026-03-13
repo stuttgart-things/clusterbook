@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/stuttgart-things/clusterbook/compare/v1.12.0...v1.12.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* remove k8s dependency that breaks Dagger OCI kustomize push ([5d00359](https://github.com/stuttgart-things/clusterbook/commit/5d003591951eaa41d5959ab1b88e3f2d3ae70f48))
+
 # [1.12.0](https://github.com/stuttgart-things/clusterbook/compare/v1.11.0...v1.12.0) (2026-03-13)
 
 
