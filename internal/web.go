@@ -69,7 +69,7 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleAPIAddIP(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("DELETE /api/v1/networks/{key}/ips/{ip}", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIDeleteIP(w, r, loadFrom, configLoc, configNm)
+		handleAPIDeleteIP(w, r, loadFrom, configLoc, configNm, pdns)
 	})
 
 	// Edit (update) existing assignment
@@ -99,7 +99,7 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleHTMXAddIP(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("POST /htmx/delete-ip", func(w http.ResponseWriter, r *http.Request) {
-		handleHTMXDeleteIP(w, r, loadFrom, configLoc, configNm)
+		handleHTMXDeleteIP(w, r, loadFrom, configLoc, configNm, pdns)
 	})
 	mux.HandleFunc("POST /htmx/edit", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXEdit(w, r, loadFrom, configLoc, configNm, pdns)
@@ -523,7 +523,7 @@ func handleAPIAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	})
 }
 
-func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
 	networkKey := r.PathValue("key")
 	ip := r.PathValue("ip")
 
@@ -535,13 +535,22 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 		return
 	}
 
-	if _, exists := network[ip]; !exists {
+	entry, exists := network[ip]
+	if !exists {
 		http.Error(w, `{"error":"ip not found"}`, http.StatusNotFound)
 		return
 	}
 
+	// Delete DNS record if one was created for this IP
+	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
+	prevCluster := entry.Cluster
+
 	delete(ipList[networkKey], ip)
 	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	if hadDNS {
+		pdns.DeleteRecord(prevCluster)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -763,7 +772,7 @@ func handleHTMXAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	}{networkKey, entries})
 }
 
-func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -785,8 +794,17 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 		return
 	}
 
+	// Delete DNS record if one was created for this IP
+	entry := ipList[networkKey][ipDigit]
+	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
+	prevCluster := entry.Cluster
+
 	delete(ipList[networkKey], ipDigit)
 	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	if hadDNS {
+		pdns.DeleteRecord(prevCluster)
+	}
 
 	// Re-render the IP table
 	entries := getIPEntries(ipList[networkKey], networkKey)
