@@ -918,7 +918,9 @@ const dashboardTemplate = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clusterbook</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/stuttgart-things/docs/main/hugo/sthings-argo.png">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
@@ -951,10 +953,10 @@ const dashboardTemplate = `<!DOCTYPE html>
         .btn-add { background: #4f46e5; color: white; padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 600; width: 100%; }
         .btn-add:hover { background: #6366f1; }
         .add-label { color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.25rem; }
-        .banner { text-align: center; margin-bottom: 2rem; padding: 1rem 0; }
-        .banner img { height: 90px; }
-        .banner-title { font-size: 1.75rem; font-weight: 700; color: #f8fafc; margin-top: 0.5rem; letter-spacing: 0.05em; }
-        .banner-sub { color: #94a3b8; font-size: 0.875rem; }
+        .banner { text-align: center; margin-bottom: 2rem; padding: 1.5rem 0; }
+        .banner img { height: 140px; filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.3)); }
+        .banner-title { font-family: 'Press Start 2P', cursive; font-size: 1.5rem; color: #818cf8; margin-top: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; text-shadow: 3px 3px 0px #312e81, -1px -1px 0px #4f46e5; }
+        .banner-sub { font-family: 'Press Start 2P', cursive; color: #f97316; font-size: 0.5rem; margin-top: 0.5rem; letter-spacing: 0.15em; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -1016,7 +1018,9 @@ const networkDetailTemplate = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clusterbook - {{.NetworkKey}}</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/stuttgart-things/docs/main/hugo/sthings-argo.png">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
@@ -1052,14 +1056,16 @@ const networkDetailTemplate = `<!DOCTYPE html>
         .btn-danger { background: #991b1b; color: white; padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.75rem; font-weight: 600; margin-left: auto; }
         .btn-danger:hover { background: #b91c1c; }
         .banner { text-align: center; margin-bottom: 1rem; padding: 0.75rem 0; }
-        .banner img { height: 60px; }
+        .banner img { height: 100px; filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.3)); }
         .banner a { text-decoration: none; }
+        .banner-title { font-family: 'Press Start 2P', cursive; font-size: 0.85rem; color: #818cf8; margin-top: 0.5rem; letter-spacing: 0.1em; text-transform: uppercase; text-shadow: 2px 2px 0px #312e81; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="banner">
             <a href="/"><img src="https://raw.githubusercontent.com/stuttgart-things/docs/main/hugo/sthings-argo.png" alt="sthings"></a>
+            <div class="banner-title">Clusterbook</div>
         </div>
         <div class="header">
             <a href="/" class="back">&larr;</a>
