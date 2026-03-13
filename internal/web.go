@@ -72,6 +72,11 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleAPIDeleteIP(w, r, loadFrom, configLoc, configNm)
 	})
 
+	// Edit (update) existing assignment
+	mux.HandleFunc("PUT /api/v1/networks/{key}/ips/{ip}", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIEditIP(w, r, loadFrom, configLoc, configNm, pdns)
+	})
+
 	// Cluster info routes
 	mux.HandleFunc("GET /api/v1/clusters", func(w http.ResponseWriter, r *http.Request) {
 		handleAPIClusters(w, r, loadFrom, configLoc, configNm)
@@ -95,6 +100,9 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 	})
 	mux.HandleFunc("POST /htmx/delete-ip", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXDeleteIP(w, r, loadFrom, configLoc, configNm)
+	})
+	mux.HandleFunc("POST /htmx/edit", func(w http.ResponseWriter, r *http.Request) {
+		handleHTMXEdit(w, r, loadFrom, configLoc, configNm, pdns)
 	})
 	mux.HandleFunc("POST /htmx/delete-network", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXDeleteNetwork(w, r, loadFrom, configLoc, configNm)
@@ -542,6 +550,67 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	})
 }
 
+func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+	networkKey := r.PathValue("key")
+	ipDigit := r.PathValue("ip")
+
+	var req struct {
+		Cluster   string `json:"cluster"`
+		Status    string `json:"status"`
+		CreateDNS bool   `json:"create_dns"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.Cluster == "" || req.Status == "" {
+		http.Error(w, `{"error":"cluster and status are required"}`, http.StatusBadRequest)
+		return
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	network, ok := ipList[networkKey]
+	if !ok {
+		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
+		return
+	}
+
+	entry, exists := network[ipDigit]
+	if !exists {
+		http.Error(w, `{"error":"ip not found"}`, http.StatusNotFound)
+		return
+	}
+
+	prevCluster := entry.Cluster
+	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
+
+	entry.Status = req.Status
+	if req.CreateDNS {
+		entry.Status = req.Status + ":DNS"
+	}
+	entry.Cluster = req.Cluster
+	ipList[networkKey][ipDigit] = entry
+
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	// Handle DNS changes
+	if hadDNS && (!req.CreateDNS || prevCluster != req.Cluster) {
+		pdns.DeleteRecord(prevCluster)
+	}
+	if req.CreateDNS && (!hadDNS || prevCluster != req.Cluster) {
+		pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": fmt.Sprintf("IP %s.%s updated: cluster=%s status=%s", networkKey, ipDigit, req.Cluster, req.Status),
+	})
+}
+
 // --- Cluster Info Handlers ---
 
 func handleAPIClusters(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
@@ -721,6 +790,69 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 
 	// Re-render the IP table
 	entries := getIPEntries(ipList[networkKey], networkKey)
+	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
+	tmpl.Execute(w, struct {
+		NetworkKey string
+		Entries    []IPEntry
+	}{networkKey, entries})
+}
+
+func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ip := r.FormValue("ip")
+	cluster := r.FormValue("cluster")
+	status := r.FormValue("status")
+	networkKey := r.FormValue("network_key")
+	createDNS := r.FormValue("create_dns") == "on"
+
+	if ip == "" || cluster == "" || status == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	ipKey, err := TruncateIP(ip)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ipDigit, err := GetLastIPDigit(ip)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	entry := ipList[ipKey][ipDigit]
+	prevCluster := entry.Cluster
+	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
+
+	// Update entry
+	entry.Status = status
+	if createDNS {
+		entry.Status = status + ":DNS"
+	}
+	entry.Cluster = cluster
+	ipList[ipKey][ipDigit] = entry
+
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	// Handle DNS changes
+	if hadDNS && (!createDNS || prevCluster != cluster) {
+		pdns.DeleteRecord(prevCluster)
+	}
+	if createDNS && (!hadDNS || prevCluster != cluster) {
+		pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
+	}
+
+	// Re-render the network detail table
+	ips := ipList[networkKey]
+	entries := getIPEntries(ips, networkKey)
 	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
 	tmpl.Execute(w, struct {
 		NetworkKey string
@@ -963,6 +1095,17 @@ const ipTablePartial = `<table>
             <td>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                 {{if or (hasPrefix .Status "ASSIGNED") (hasPrefix .Status "PENDING")}}
+                <form class="form-inline" hx-post="/htmx/edit" hx-target="#ip-table" hx-swap="innerHTML">
+                    <input type="hidden" name="ip" value="{{.IP}}">
+                    <input type="hidden" name="network_key" value="{{$.NetworkKey}}">
+                    <input type="text" name="cluster" value="{{.Cluster}}" placeholder="Cluster name" required>
+                    <select name="status">
+                        <option value="ASSIGNED" {{if hasPrefix .Status "ASSIGNED"}}selected{{end}}>ASSIGNED</option>
+                        <option value="PENDING" {{if hasPrefix .Status "PENDING"}}selected{{end}}>PENDING</option>
+                    </select>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: #94a3b8; cursor: pointer;"><input type="checkbox" name="create_dns" {{if hasSuffix .Status ":DNS"}}checked{{end}} style="accent-color: #6366f1;"> DNS</label>
+                    <button type="submit" class="btn btn-assign">Save</button>
+                </form>
                 <form class="form-inline" hx-post="/htmx/release" hx-target="#ip-table" hx-swap="innerHTML">
                     <input type="hidden" name="ip" value="{{.IP}}">
                     <input type="hidden" name="network_key" value="{{$.NetworkKey}}">
