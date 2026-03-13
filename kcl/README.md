@@ -1,6 +1,6 @@
 # clusterbook / KCL Deployment
 
-KCL-based Kubernetes manifests for clusterbook. Renders Namespace, ServiceAccount, ConfigMap, Role/RoleBinding, Deployment (dual-port: gRPC + HTTP), Services, and optional HTTPRoute (Gateway API).
+KCL-based Kubernetes manifests for clusterbook. Renders Namespace, ServiceAccount, ConfigMap, Secret (for PDNS credentials), Role/RoleBinding, Deployment (dual-port: gRPC + HTTP), Services, and optional HTTPRoute (Gateway API).
 
 ## Render Manifests
 
@@ -16,7 +16,7 @@ dagger call -m github.com/stuttgart-things/dagger/kcl@v0.82.0 run \
 # render with inline parameters
 dagger call -m github.com/stuttgart-things/dagger/kcl@v0.82.0 run \
   --source kcl \
-  --parameters 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.6.0,config.namespace=clusterbook' \
+  --parameters 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.11.0,config.namespace=clusterbook' \
   export --path /tmp/rendered-clusterbook.yaml
 ```
 
@@ -24,7 +24,7 @@ dagger call -m github.com/stuttgart-things/dagger/kcl@v0.82.0 run \
 
 ```bash
 kcl run kcl/main.k \
-  -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.6.0' \
+  -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.11.0' \
   -D 'config.namespace=clusterbook'
 ```
 
@@ -35,7 +35,7 @@ kcl run kcl/main.k \
 cd kcl && kcl run | kubectl apply -f -
 
 # or with custom config
-kcl run -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.6.0' \
+kcl run -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.11.0' \
         -D 'config.configName=networks-labul' \
   | kubectl apply -f -
 ```
@@ -55,7 +55,7 @@ kcl run -D 'config.httpRouteEnabled=true' \
 |---|---|---|
 | `config.name` | `clusterbook` | Resource name |
 | `config.namespace` | `clusterbook` | Target namespace |
-| `config.image` | `ghcr.io/stuttgart-things/clusterbook:v1.6.0` | Container image |
+| `config.image` | `ghcr.io/stuttgart-things/clusterbook:v1.11.0` | Container image |
 | `config.imagePullPolicy` | `Always` | Image pull policy |
 | `config.replicas` | `1` | Replica count |
 | `config.grpcPort` | `50051` | gRPC container port |
@@ -73,6 +73,10 @@ kcl run -D 'config.httpRouteEnabled=true' \
 | `config.httpRouteParentRefNamespace` | *(empty)* | Gateway namespace |
 | `config.httpRouteHostname` | *(empty)* | Hostname for HTTPRoute |
 | `config.httpRouteAnnotations` | `{}` | Extra annotations for HTTPRoute |
+| `config.pdnsEnabled` | `false` | Enable PowerDNS integration |
+| `config.pdnsURL` | *(empty)* | PowerDNS API base URL |
+| `config.pdnsToken` | *(empty)* | PowerDNS API key (stored in Secret) |
+| `config.pdnsZone` | *(empty)* | PowerDNS DNS zone |
 | `config.cpuRequest` | `50m` | CPU request |
 | `config.cpuLimit` | `100m` | CPU limit |
 | `config.memoryRequest` | `64Mi` | Memory request |
@@ -86,7 +90,7 @@ kcl run -D 'config.httpRouteEnabled=true' \
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook:v1.6.0
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
 config.namespace: clusterbook
 config.configName: networks-labul
 ```
@@ -95,7 +99,7 @@ config.configName: networks-labul
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook:v1.6.0
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
 config.namespace: clusterbook-dev
 config.loadConfigFrom: disk
 config.configLocation: /config
@@ -106,13 +110,26 @@ config.configName: config.yaml
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook:v1.6.0
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
 config.namespace: clusterbook
 config.configName: networks-labul
 config.httpRouteEnabled: true
 config.httpRouteParentRefName: sthings-gateway
 config.httpRouteParentRefNamespace: ingress-system
 config.httpRouteHostname: clusterbook.sthings-vsphere.labul.sva.de
+```
+
+### With PowerDNS integration
+
+```yaml
+---
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
+config.namespace: clusterbook
+config.configName: networks-labul
+config.pdnsEnabled: true
+config.pdnsURL: https://pdns.sthings-vsphere.labul.sva.de
+config.pdnsToken: my-api-key
+config.pdnsZone: sthings.io
 ```
 
 ## Rendered Resources
@@ -127,4 +144,5 @@ config.httpRouteHostname: clusterbook.sthings-vsphere.labul.sva.de
 | Deployment | `{name}` | Always |
 | Service (gRPC) | `{name}` | Always |
 | Service (HTTP) | `{name}-http` | Always |
+| Secret | `{name}-pdns` | Only if `pdnsEnabled=true` |
 | HTTPRoute | `{name}` | Only if `httpRouteEnabled=true` |

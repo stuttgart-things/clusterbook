@@ -8,6 +8,7 @@ import crd
 import namespace
 import serviceaccount
 import configmap
+import secret
 import deploy
 import service
 import rbac
@@ -20,6 +21,7 @@ _manifests = [
         namespace.namespace
         serviceaccount.serviceAccount
         configmap.configMap
+        secret.pdnsSecret
         rbac.role
         rbac.roleBinding
         deploy.deployment
