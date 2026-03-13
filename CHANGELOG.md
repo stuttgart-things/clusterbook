@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/stuttgart-things/clusterbook/compare/v1.10.1...v1.11.0) (2026-03-13)
+
+
+### Features
+
+* replace ASCII banner with sthings logo image in dashboard ([#96](https://github.com/stuttgart-things/clusterbook/issues/96)) ([c2a1874](https://github.com/stuttgart-things/clusterbook/commit/c2a18743194dc4860b8c9b89a381868ff051046f))
+
 ## [1.10.1](https://github.com/stuttgart-things/clusterbook/compare/v1.10.0...v1.10.1) (2026-03-13)
 
 
