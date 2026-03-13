@@ -1,3 +1,10 @@
+## [1.9.1](https://github.com/stuttgart-things/clusterbook/compare/v1.9.0...v1.9.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* update default image tag to v1.9.0 in KCL schema ([63bd622](https://github.com/stuttgart-things/clusterbook/commit/63bd6226f4bce774ffd76864dfcb8ae7ad07016a))
+
 # [1.9.0](https://github.com/stuttgart-things/clusterbook/compare/v1.8.0...v1.9.0) (2026-03-12)
 
 
