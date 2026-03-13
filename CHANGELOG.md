@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/stuttgart-things/clusterbook/compare/v1.9.1...v1.10.0) (2026-03-13)
+
+
+### Features
+
+* add retro ASCII art banner header to HTMX dashboard ([#95](https://github.com/stuttgart-things/clusterbook/issues/95)) ([73adb5e](https://github.com/stuttgart-things/clusterbook/commit/73adb5eb9813984e86e93781f344c5a1a63935e7))
+
 ## [1.9.1](https://github.com/stuttgart-things/clusterbook/compare/v1.9.0...v1.9.1) (2026-03-13)
 
 
