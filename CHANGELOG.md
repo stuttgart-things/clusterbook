@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/stuttgart-things/clusterbook/compare/v1.14.0...v1.15.0) (2026-03-13)
+
+
+### Features
+
+* retro 8-bit header with larger logo and favicon ([f5bd004](https://github.com/stuttgart-things/clusterbook/commit/f5bd0048da4bc37215f956b4a8d6a515c544755f))
+
 # [1.14.0](https://github.com/stuttgart-things/clusterbook/compare/v1.13.0...v1.14.0) (2026-03-13)
 
 
