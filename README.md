@@ -17,10 +17,12 @@ gitops cluster configuration management
 | Feature | Description |
 |---------|-------------|
 | IP Address Management | Allocate and track IPs across Kubernetes clusters |
+| CIDR-aware Allocation | Define pools as CIDR ranges (e.g. `10.31.103.0/24`) with auto-expansion |
 | gRPC API | Programmatic access on port `:50051` |
 | REST API | JSON endpoints on port `:8080` |
 | HTMX Dashboard | Web UI for IP pool visualization and management |
 | Dual Storage | Filesystem (YAML) or Kubernetes CRD backend |
+| PowerDNS Integration | Optional DNS record management for IP assignments |
 | KCL Manifests | Type-safe Kubernetes deployment with KCL |
 
 ## DEPLOYMENT
@@ -53,6 +55,32 @@ kcl run -D config.httpRouteEnabled=true \
 
 ```bash
 cd kcl && kcl run | kubectl apply -f -
+```
+
+</details>
+
+## LOCAL DEVELOPMENT
+
+<details><summary>RUN LOCALLY</summary>
+
+### From disk config (easiest)
+
+```bash
+LOAD_CONFIG_FROM=disk CONFIG_LOCATION=tests CONFIG_NAME=config.yaml go run .
+```
+
+### From Kubernetes CR (requires cluster access)
+
+```bash
+LOAD_CONFIG_FROM=cr CONFIG_LOCATION=clusterbook CONFIG_NAME=networks-labul go run .
+```
+
+### Using Taskfile + .env
+
+Create a `.env` file (see [example below](#example-env-file)), then:
+
+```bash
+task run
 ```
 
 </details>
@@ -98,6 +126,33 @@ curl -X POST http://localhost:8080/api/v1/networks/10.31.103/release \
   -d '{"ip": "10.31.103.6"}'
 ```
 
+### Create a network from CIDR
+
+```bash
+# Creates a /24 pool with 252 usable IPs (excludes .0, .1, .2, .255)
+curl -X POST http://localhost:8080/api/v1/networks/cidr \
+  -H "Content-Type: application/json" \
+  -d '{"cidr": "10.31.105.0/24", "reserved": ["1", "2"]}'
+```
+
+The existing `POST /api/v1/networks` endpoint also accepts CIDR:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/networks \
+  -H "Content-Type: application/json" \
+  -d '{"cidr": "10.31.105.0/28"}'
+```
+
+CIDR ranges spanning multiple /24 blocks (e.g. `/23`) automatically create multiple network entries.
+
+### Assign an IP with DNS
+
+```bash
+curl -X POST http://localhost:8080/api/v1/networks/10.31.103/assign \
+  -H "Content-Type: application/json" \
+  -d '{"ip": "10.31.103.6", "cluster": "my-cluster", "status": "ASSIGNED", "create_dns": true}'
+```
+
 </details>
 
 <details><summary>gRPC</summary>
@@ -110,6 +165,30 @@ grpcurl -plaintext localhost:50051 ipservice.IpService/GetIpAddressRange \
 # Assign IPs to a cluster
 grpcurl -plaintext localhost:50051 ipservice.IpService/SetClusterInfo \
   -d '{"ipAddressRange": "10.31.103.6", "clusterName": "my-cluster", "status": "ASSIGNED"}'
+```
+
+</details>
+
+<details><summary>DAGGER MODULE</summary>
+
+A [Dagger](https://dagger.io) module is available at [stuttgart-things/dagger/clusterbook](https://github.com/stuttgart-things/dagger) for pipeline integration.
+
+```bash
+# List all networks
+dagger call list-networks --server="clusterbook.example.com:8080"
+
+# Create network from CIDR
+dagger call create-network-from-cidr --server="localhost:8080" --cidr="10.31.105.0/24" --reserved="1"
+
+# Assign IP with DNS
+dagger call assign-ip --server="localhost:8080" --network-key="10.31.103" \
+  --ip="10.31.103.6" --cluster="my-cluster" --status="ASSIGNED" --create-dns
+
+# Release IP
+dagger call release-ip --server="localhost:8080" --network-key="10.31.103" --ip="10.31.103.6"
+
+# List clusters
+dagger call list-clusters --server="localhost:8080"
 ```
 
 </details>
@@ -193,6 +272,10 @@ EOF
 | `SERVER_PORT` | gRPC server port | `50051` |
 | `HTTP_PORT` | HTTP/HTMX server port | `8080` |
 | `KUBECONFIG` | K8s config path (for CR backend) | - |
+| `PDNS_ENABLED` | Enable PowerDNS integration | `false` |
+| `PDNS_URL` | PowerDNS API URL | - |
+| `PDNS_TOKEN` | PowerDNS API token | - |
+| `PDNS_ZONE` | PowerDNS zone for records | - |
 
 ## DEV TASKS
 

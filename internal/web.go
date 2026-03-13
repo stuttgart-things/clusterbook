@@ -62,6 +62,9 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 	mux.HandleFunc("POST /api/v1/networks", func(w http.ResponseWriter, r *http.Request) {
 		handleAPICreateNetwork(w, r, loadFrom, configLoc, configNm)
 	})
+	mux.HandleFunc("POST /api/v1/networks/cidr", func(w http.ResponseWriter, r *http.Request) {
+		handleAPICreateNetworkFromCIDR(w, r, loadFrom, configLoc, configNm)
+	})
 	mux.HandleFunc("DELETE /api/v1/networks/{key}", func(w http.ResponseWriter, r *http.Request) {
 		handleAPIDeleteNetwork(w, r, loadFrom, configLoc, configNm)
 	})
@@ -426,8 +429,10 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 
 func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
 	var req struct {
-		Network string   `json:"network"`
-		IPs     []string `json:"ips"`
+		Network  string   `json:"network"`
+		IPs      []string `json:"ips"`
+		CIDR     string   `json:"cidr"`
+		Reserved []string `json:"reserved"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -435,12 +440,51 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 		return
 	}
 
-	if req.Network == "" || len(req.IPs) == 0 {
-		http.Error(w, `{"error":"network and ips are required"}`, http.StatusBadRequest)
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	// CIDR mode: expand CIDR notation into networks
+	if req.CIDR != "" {
+		networks, err := CIDRToNetworks(req.CIDR, req.Reserved)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+			return
+		}
+
+		createdKeys := []string{}
+		totalIPs := 0
+
+		for networkKey, octets := range networks {
+			if _, exists := ipList[networkKey]; exists {
+				http.Error(w, fmt.Sprintf(`{"error":"network %s already exists"}`, networkKey), http.StatusConflict)
+				return
+			}
+
+			ipList[networkKey] = make(IPs)
+			for _, octet := range octets {
+				ipList[networkKey][octet] = IPInfo{}
+			}
+
+			createdKeys = append(createdKeys, networkKey)
+			totalIPs += len(octets)
+		}
+
+		saveConfig(ipList, loadFrom, configLoc, configNm)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":   "ok",
+			"message":  fmt.Sprintf("Created %d network(s) with %d IPs from CIDR %s", len(createdKeys), totalIPs, req.CIDR),
+			"networks": createdKeys,
+		})
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	// Flat list mode: existing behavior
+	if req.Network == "" || len(req.IPs) == 0 {
+		http.Error(w, `{"error":"network and ips are required, or provide cidr"}`, http.StatusBadRequest)
+		return
+	}
 
 	if _, exists := ipList[req.Network]; exists {
 		http.Error(w, `{"error":"network already exists"}`, http.StatusConflict)
@@ -459,6 +503,59 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"message": fmt.Sprintf("Network %s created with %d IPs", req.Network, len(req.IPs)),
+	})
+}
+
+func handleAPICreateNetworkFromCIDR(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	var req struct {
+		CIDR     string   `json:"cidr"`
+		Reserved []string `json:"reserved"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.CIDR == "" {
+		http.Error(w, `{"error":"cidr is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	networks, err := CIDRToNetworks(req.CIDR, req.Reserved)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	createdKeys := []string{}
+	totalIPs := 0
+
+	for networkKey, octets := range networks {
+		if _, exists := ipList[networkKey]; exists {
+			http.Error(w, fmt.Sprintf(`{"error":"network %s already exists"}`, networkKey), http.StatusConflict)
+			return
+		}
+
+		ipList[networkKey] = make(IPs)
+		for _, octet := range octets {
+			ipList[networkKey][octet] = IPInfo{}
+		}
+
+		createdKeys = append(createdKeys, networkKey)
+		totalIPs += len(octets)
+	}
+
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":   "ok",
+		"message":  fmt.Sprintf("Created %d network(s) with %d IPs from CIDR %s", len(createdKeys), totalIPs, req.CIDR),
+		"networks": createdKeys,
 	})
 }
 
