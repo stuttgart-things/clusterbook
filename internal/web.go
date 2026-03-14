@@ -1144,8 +1144,8 @@ const dashboardTemplate = `<!DOCTYPE html>
         .add-label { color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.25rem; }
         .banner { text-align: center; margin-bottom: 2rem; padding: 1.5rem 0; }
         .banner img { height: 140px; filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.3)); }
-        .banner-title { font-family: 'Press Start 2P', cursive; font-size: 1.5rem; color: #818cf8; margin-top: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; text-shadow: 3px 3px 0px #312e81, -1px -1px 0px #4f46e5; }
-        .banner-sub { font-family: 'Press Start 2P', cursive; color: #f97316; font-size: 0.5rem; margin-top: 0.5rem; letter-spacing: 0.15em; text-transform: uppercase; }
+        .banner-title { font-family: 'Press Start 2P', cursive; font-size: 1.8rem; color: #818cf8; margin-top: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; text-shadow: 3px 3px 0px #312e81, -1px -1px 0px #4f46e5; }
+        .banner-sub { font-family: 'Press Start 2P', cursive; color: #f97316; font-size: 0.65rem; margin-top: 0.5rem; letter-spacing: 0.15em; text-transform: uppercase; }
         .footer { margin-top: 2rem; padding: 1rem; border-top: 1px solid #334155; display: flex; justify-content: center; gap: 2rem; font-size: 0.75rem; color: #64748b; }
         .footer-item { display: flex; align-items: center; gap: 0.35rem; }
         .footer-label { color: #475569; }
@@ -1256,7 +1256,7 @@ const networkDetailTemplate = `<!DOCTYPE html>
         .banner { text-align: center; margin-bottom: 1rem; padding: 0.75rem 0; }
         .banner img { height: 100px; filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.3)); }
         .banner a { text-decoration: none; }
-        .banner-title { font-family: 'Press Start 2P', cursive; font-size: 0.85rem; color: #818cf8; margin-top: 0.5rem; letter-spacing: 0.1em; text-transform: uppercase; text-shadow: 2px 2px 0px #312e81; }
+        .banner-title { font-family: 'Press Start 2P', cursive; font-size: 1.0rem; color: #818cf8; margin-top: 0.5rem; letter-spacing: 0.1em; text-transform: uppercase; text-shadow: 2px 2px 0px #312e81; }
     </style>
 </head>
 <body>
