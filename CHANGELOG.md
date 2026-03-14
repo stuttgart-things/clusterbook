@@ -1,3 +1,10 @@
+## [1.19.1](https://github.com/stuttgart-things/clusterbook/compare/v1.19.0...v1.19.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/crossplane/crossplane-runtime to v2 ([cb1a898](https://github.com/stuttgart-things/clusterbook/commit/cb1a89892cf68aefca860850b6706e22d4775cb3))
+
 # [1.19.0](https://github.com/stuttgart-things/clusterbook/compare/v1.18.2...v1.19.0) (2026-03-14)
 
 
