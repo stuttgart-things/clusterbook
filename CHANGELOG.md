@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/stuttgart-things/clusterbook/compare/v1.18.2...v1.19.0) (2026-03-14)
+
+
+### Features
+
+* increase banner font size for title and subtitle ([e79b8e0](https://github.com/stuttgart-things/clusterbook/commit/e79b8e07ecbdd4ac13a0d4bffc6c4cf981b6a40f))
+
 ## [1.18.2](https://github.com/stuttgart-things/clusterbook/compare/v1.18.1...v1.18.2) (2026-03-14)
 
 
