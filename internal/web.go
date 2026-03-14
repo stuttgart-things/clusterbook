@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // NetworkPoolInfo holds summary info for a network pool
@@ -164,12 +165,28 @@ func getIPEntries(ips IPs, networkKey string) []IPEntry {
 
 // --- HTMX Frontend Handlers ---
 
+type dashboardData struct {
+	Pools     []NetworkPoolInfo
+	Version   string
+	Commit    string
+	StartTime string
+}
+
+var serverStartTime = time.Now().Format(time.RFC3339)
+
 func handleDashboard(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
 	ipList := LoadProfile(loadFrom, configLoc, configNm)
 	pools := getPoolInfos(ipList)
 
+	data := dashboardData{
+		Pools:     pools,
+		Version:   version,
+		Commit:    commit,
+		StartTime: serverStartTime,
+	}
+
 	tmpl := template.Must(template.New("dashboard").Funcs(TemplateFuncs()).Parse(dashboardTemplate))
-	if err := tmpl.Execute(w, pools); err != nil {
+	if err := tmpl.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -1129,6 +1146,10 @@ const dashboardTemplate = `<!DOCTYPE html>
         .banner img { height: 140px; filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.3)); }
         .banner-title { font-family: 'Press Start 2P', cursive; font-size: 1.5rem; color: #818cf8; margin-top: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; text-shadow: 3px 3px 0px #312e81, -1px -1px 0px #4f46e5; }
         .banner-sub { font-family: 'Press Start 2P', cursive; color: #f97316; font-size: 0.5rem; margin-top: 0.5rem; letter-spacing: 0.15em; text-transform: uppercase; }
+        .footer { margin-top: 2rem; padding: 1rem; border-top: 1px solid #334155; display: flex; justify-content: center; gap: 2rem; font-size: 0.75rem; color: #64748b; }
+        .footer-item { display: flex; align-items: center; gap: 0.35rem; }
+        .footer-label { color: #475569; }
+        .footer-value { color: #94a3b8; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -1139,7 +1160,7 @@ const dashboardTemplate = `<!DOCTYPE html>
             <div class="banner-sub">IP Address Management</div>
         </div>
         <div class="grid">
-            {{range .}}
+            {{range .Pools}}
             <div class="card">
                 <a href="/network/{{.NetworkKey}}">
                     <div class="card-title">{{.NetworkKey}}.x</div>
@@ -1179,6 +1200,11 @@ const dashboardTemplate = `<!DOCTYPE html>
                     <button type="submit" class="btn-add">Create Network</button>
                 </form>
             </div>
+        </div>
+        <div class="footer">
+            <div class="footer-item"><span class="footer-label">version</span> <span class="footer-value">{{.Version}}</span></div>
+            <div class="footer-item"><span class="footer-label">commit</span> <span class="footer-value">{{if gt (len .Commit) 7}}{{slice .Commit 0 7}}{{else}}{{.Commit}}{{end}}</span></div>
+            <div class="footer-item"><span class="footer-label">deployed</span> <span class="footer-value">{{.StartTime}}</span></div>
         </div>
     </div>
 </body>
