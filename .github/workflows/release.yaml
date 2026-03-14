@@ -21,6 +21,7 @@ jobs:
     uses: stuttgart-things/github-workflow-templates/.github/workflows/call-go-release.yaml@main
     with:
       runs-on: ubuntu-latest
+      go-version: "1.26.0"
       stage-image: true
       push-kustomize: true
       kcl-source-dir: kcl
