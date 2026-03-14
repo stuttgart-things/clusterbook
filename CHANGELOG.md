@@ -1,3 +1,10 @@
+## [1.18.2](https://github.com/stuttgart-things/clusterbook/compare/v1.18.1...v1.18.2) (2026-03-14)
+
+
+### Bug Fixes
+
+* use ko-compatible env var templates in ldflags ([e79d55f](https://github.com/stuttgart-things/clusterbook/commit/e79d55f9b7fc6eda33806473f322ea9723247fd8))
+
 ## [1.18.1](https://github.com/stuttgart-things/clusterbook/compare/v1.18.0...v1.18.1) (2026-03-14)
 
 
