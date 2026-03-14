@@ -1,3 +1,10 @@
+## [1.18.1](https://github.com/stuttgart-things/clusterbook/compare/v1.18.0...v1.18.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* set go-version to 1.26.0 in release workflow ([ef9d5aa](https://github.com/stuttgart-things/clusterbook/commit/ef9d5aa3a07dabc66753e710adfafeddf3189902))
+
 # [1.18.0](https://github.com/stuttgart-things/clusterbook/compare/v1.17.0...v1.18.0) (2026-03-14)
 
 
