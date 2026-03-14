@@ -1,3 +1,17 @@
+# [1.18.0](https://github.com/stuttgart-things/clusterbook/compare/v1.17.0...v1.18.0) (2026-03-14)
+
+
+### Bug Fixes
+
+* set go-version to 1.26.0 in CI workflow ([f336606](https://github.com/stuttgart-things/clusterbook/commit/f336606367d0da8882be18dc0fa2502711ff5389))
+
+
+### Features
+
+* add /reserve endpoint for atomic IP reservation ([6aab6aa](https://github.com/stuttgart-things/clusterbook/commit/6aab6aa66faa2014f6a841edb94c88cbbf7b4d8e))
+* add Crossplane provider for clusterbook IPAM ([82af4b7](https://github.com/stuttgart-things/clusterbook/commit/82af4b76d5861c01b95078466a699ecd1e4c5998)), closes [#108](https://github.com/stuttgart-things/clusterbook/issues/108) [#109](https://github.com/stuttgart-things/clusterbook/issues/109) [#110](https://github.com/stuttgart-things/clusterbook/issues/110) [#111](https://github.com/stuttgart-things/clusterbook/issues/111) [#112](https://github.com/stuttgart-things/clusterbook/issues/112) [#113](https://github.com/stuttgart-things/clusterbook/issues/113) [#99](https://github.com/stuttgart-things/clusterbook/issues/99)
+* show version, commit, and deploy time in HTMX dashboard ([96cc9e4](https://github.com/stuttgart-things/clusterbook/commit/96cc9e43c785e158fa12069cab8d4a05f181bfbd))
+
 # [1.17.0](https://github.com/stuttgart-things/clusterbook/compare/v1.16.0...v1.17.0) (2026-03-13)
 
 
