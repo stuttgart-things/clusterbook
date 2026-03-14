@@ -1,0 +1,11 @@
+apiVersion: meta.pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-clusterbook
+  annotations:
+    meta.crossplane.io/maintainer: Stuttgart Things <patrick.hermann@sva.de>
+    meta.crossplane.io/source: github.com/stuttgart-things/clusterbook
+    meta.crossplane.io/description: Crossplane provider for clusterbook IPAM
+spec:
+  controller:
+    image: ghcr.io/stuttgart-things/provider-clusterbook:latest

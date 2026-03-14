@@ -1,0 +1,6 @@
+---
+defaultBaseImage: ghcr.io/stuttgart-things/sthings-alpine:1.23
+builds:
+  - id: provider-clusterbook
+    dir: .
+    main: main.go
