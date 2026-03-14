@@ -18,4 +18,5 @@ jobs:
     uses: stuttgart-things/github-workflow-templates/.github/workflows/call-ko-build.yaml@main
     with:
       runs-on: ubuntu-latest
+      go-version: "1.26.0"
     secrets: inherit # pragma: allowlist secret
