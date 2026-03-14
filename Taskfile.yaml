@@ -152,6 +152,29 @@ tasks:
       - go mod tidy
       - cmd: go test ./... -v
 
+  provider-build:
+    desc: Build Crossplane provider
+    dir: provider
+    cmds:
+      - go mod tidy
+      - go build ./...
+
+  provider-test:
+    desc: Test Crossplane provider
+    dir: provider
+    cmds:
+      - go mod tidy
+      - go test ./... -v
+
+  provider-build-ko:
+    desc: Build Crossplane provider image w/ KO
+    dir: provider
+    deps: [provider-test]
+    env:
+      KO_DOCKER_REPO: ghcr.io/{{ .ORGA_NAME }}/provider-clusterbook
+    cmds:
+      - ko build {{ .MODULE }}/provider --push
+
   commit:
     desc: Commit + push code into branch
     deps:
