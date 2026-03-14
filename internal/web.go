@@ -54,6 +54,9 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 	mux.HandleFunc("POST /api/v1/networks/{key}/assign", func(w http.ResponseWriter, r *http.Request) {
 		handleAPIAssign(w, r, loadFrom, configLoc, configNm, pdns)
 	})
+	mux.HandleFunc("POST /api/v1/networks/{key}/reserve", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIReserve(w, r, loadFrom, configLoc, configNm, pdns)
+	})
 	mux.HandleFunc("POST /api/v1/networks/{key}/release", func(w http.ResponseWriter, r *http.Request) {
 		handleAPIRelease(w, r, loadFrom, configLoc, configNm, pdns)
 	})
@@ -377,6 +380,78 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"message": fmt.Sprintf("IP %s assigned to cluster %s", req.IP, req.Cluster),
+	})
+}
+
+// handleAPIReserve finds an available IP in the network, assigns it to the cluster, and returns the full IP.
+func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+	networkKey := r.PathValue("key")
+
+	var req struct {
+		Cluster   string `json:"cluster"`
+		Status    string `json:"status"`
+		CreateDNS bool   `json:"create_dns"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.Cluster == "" {
+		http.Error(w, `{"error":"cluster is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.Status == "" {
+		req.Status = "ASSIGNED"
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	networkIPs, ok := ipList[networkKey]
+	if !ok {
+		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
+		return
+	}
+
+	// Find an available IP
+	var foundDigit string
+	for digit, info := range networkIPs {
+		if info.Status == "" {
+			foundDigit = digit
+			break
+		}
+	}
+
+	if foundDigit == "" {
+		http.Error(w, `{"error":"no available IPs in network"}`, http.StatusConflict)
+		return
+	}
+
+	fullIP := networkKey + "." + foundDigit
+
+	// Assign the IP
+	entry := networkIPs[foundDigit]
+	entry.Status = req.Status
+	if req.CreateDNS {
+		entry.Status = req.Status + ":DNS"
+	}
+	entry.Cluster = req.Cluster
+	ipList[networkKey][foundDigit] = entry
+
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	if req.CreateDNS {
+		pdns.CreateRecord(req.Cluster, fullIP)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"ip":      fullIP,
+		"digit":   foundDigit,
+		"status":  req.Status,
+		"cluster": req.Cluster,
 	})
 }
 
