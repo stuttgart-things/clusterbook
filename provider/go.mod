@@ -3,7 +3,7 @@ module github.com/stuttgart-things/clusterbook/provider
 go 1.26.0
 
 require (
-	github.com/crossplane/crossplane-runtime v1.20.0
+	github.com/crossplane/crossplane-runtime/v2 v2.2.0
 	github.com/crossplane/crossplane-runtime/v2 v2.2.0
 	github.com/pkg/errors v0.9.1
 	k8s.io/apimachinery v0.35.2
