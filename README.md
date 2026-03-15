@@ -83,6 +83,18 @@ Create a `.env` file (see [example below](#example-env-file)), then:
 task run
 ```
 
+### Quick web UI start (no .env needed)
+
+```bash
+task run-web
+```
+
+This runs the web UI with disk config from `tests/config.yaml` on port `8080`. Override defaults with:
+
+```bash
+task run-web CONFIG_LOCATION=mydir CONFIG_NAME=myconfig.yaml HTTP_PORT=9090
+```
+
 </details>
 
 ## USAGE

@@ -71,6 +71,20 @@ tasks:
     cmds:
       - "$GOPATH/bin/{{ .PROJECT_NAME }}"
 
+  run-web:
+    desc: Run web UI with disk config (local dev)
+    vars:
+      CONFIG_LOCATION: '{{ .CONFIG_LOCATION | default "tests" }}'
+      CONFIG_NAME: '{{ .CONFIG_NAME | default "config.yaml" }}'
+      HTTP_PORT: '{{ .HTTP_PORT | default "8080" }}'
+    env:
+      LOAD_CONFIG_FROM: disk
+      CONFIG_LOCATION: "{{ .CONFIG_LOCATION }}"
+      CONFIG_NAME: "{{ .CONFIG_NAME }}"
+      HTTP_PORT: "{{ .HTTP_PORT }}"
+    cmds:
+      - go run .
+
   build-client:
     desc: Build client
     deps: [proto]
