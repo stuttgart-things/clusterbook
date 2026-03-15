@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // NetworkPoolInfo holds summary info for a network pool
@@ -172,7 +171,6 @@ type dashboardData struct {
 	StartTime string
 }
 
-var serverStartTime = time.Now().Format(time.RFC3339)
 
 func handleDashboard(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
 	ipList := LoadProfile(loadFrom, configLoc, configNm)
@@ -182,7 +180,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		Pools:     pools,
 		Version:   version,
 		Commit:    commit,
-		StartTime: serverStartTime,
+		StartTime: date,
 	}
 
 	tmpl := template.Must(template.New("dashboard").Funcs(TemplateFuncs()).Parse(dashboardTemplate))
@@ -1204,7 +1202,8 @@ const dashboardTemplate = `<!DOCTYPE html>
         <div class="footer">
             <div class="footer-item"><span class="footer-label">version</span> <span class="footer-value">{{.Version}}</span></div>
             <div class="footer-item"><span class="footer-label">commit</span> <span class="footer-value">{{if gt (len .Commit) 7}}{{slice .Commit 0 7}}{{else}}{{.Commit}}{{end}}</span></div>
-            <div class="footer-item"><span class="footer-label">deployed</span> <span class="footer-value">{{.StartTime}}</span></div>
+            <div class="footer-item"><span class="footer-label">built</span> <span class="footer-value">{{.StartTime}}</span></div>
+            <div class="footer-item" style="margin-left:auto"><span class="footer-label">a</span> <a href="https://github.com/stuttgart-things" target="_blank" style="color:#818cf8;text-decoration:none">stuttgart-things</a> <span class="footer-label">project</span> <img src="https://raw.githubusercontent.com/stuttgart-things/docs/main/hugo/sthings-logo.png" alt="sthings" style="height:24px;vertical-align:middle"></div>
         </div>
     </div>
 </body>
