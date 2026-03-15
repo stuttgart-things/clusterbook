@@ -1,3 +1,11 @@
+## [1.19.2](https://github.com/stuttgart-things/clusterbook/compare/v1.19.1...v1.19.2) (2026-03-15)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/crossplane/crossplane-runtime to v2 ([8702ac1](https://github.com/stuttgart-things/clusterbook/commit/8702ac19cc7b5eda7db2d4ccd4dc9f582e64f675))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.23.3 ([32c0df7](https://github.com/stuttgart-things/clusterbook/commit/32c0df7379e11d7b9c27974667e49cc48d81cc6c))
+
 ## [1.19.1](https://github.com/stuttgart-things/clusterbook/compare/v1.19.0...v1.19.1) (2026-03-14)
 
 
