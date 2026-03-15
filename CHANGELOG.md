@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/stuttgart-things/clusterbook/compare/v1.19.3...v1.20.0) (2026-03-15)
+
+
+### Features
+
+* add run-web task and improve footer with project link ([899c87f](https://github.com/stuttgart-things/clusterbook/commit/899c87f19ef102984eac3feba719ef3c34541f2c))
+
 ## [1.19.3](https://github.com/stuttgart-things/clusterbook/compare/v1.19.2...v1.19.3) (2026-03-15)
 
 
