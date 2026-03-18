@@ -7,7 +7,7 @@ require (
 	github.com/pterm/pterm v0.12.83
 	github.com/stretchr/testify v1.11.1
 	go.hein.dev/go-version v0.1.0
-	google.golang.org/grpc v1.79.2
+	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.35.2
