@@ -119,7 +119,7 @@ func TestTruncateIP(t *testing.T) {
 
 // TestConvertFromCRFormat tests the ConvertFromCRFormat function
 func TestConvertFromCRFormat(t *testing.T) {
-	// Input data in CR format
+	// Input data in CR format, including DNS suffix case
 	data := map[string][]string{
 		"10.31.103": {
 			"3:assigned:sandiego",
@@ -129,6 +129,10 @@ func TestConvertFromCRFormat(t *testing.T) {
 		"10.31.104": {
 			"4:pending:losangeles",
 			"5",
+		},
+		"10.31.102": {
+			"2:ASSIGNED:DNS:sthings-infra",
+			"3",
 		},
 	}
 
@@ -141,6 +145,10 @@ func TestConvertFromCRFormat(t *testing.T) {
 		"10.31.104": {
 			"4": {Status: "pending", Cluster: "losangeles"},
 			"5": {Status: "", Cluster: ""},
+		},
+		"10.31.102": {
+			"2": {Status: "ASSIGNED:DNS", Cluster: "sthings-infra"},
+			"3": {Status: "", Cluster: ""},
 		},
 	}
 
