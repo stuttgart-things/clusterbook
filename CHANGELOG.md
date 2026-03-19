@@ -1,3 +1,10 @@
+## [1.20.3](https://github.com/stuttgart-things/clusterbook/compare/v1.20.2...v1.20.3) (2026-03-19)
+
+
+### Bug Fixes
+
+* **deps:** update module k8s.io/client-go to v0.35.3 ([7aa1d57](https://github.com/stuttgart-things/clusterbook/commit/7aa1d5798fe53f92f4369988a9e71810ec5bed09))
+
 ## [1.20.2](https://github.com/stuttgart-things/clusterbook/compare/v1.20.1...v1.20.2) (2026-03-19)
 
 
