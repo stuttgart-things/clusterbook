@@ -1,3 +1,10 @@
+## [1.21.2](https://github.com/stuttgart-things/clusterbook/compare/v1.21.1...v1.21.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* show full wildcard FQDN in DNS test result ([63d79fe](https://github.com/stuttgart-things/clusterbook/commit/63d79fe9b34819e90001f9d6d9bf28026c6b3ffa))
+
 ## [1.21.1](https://github.com/stuttgart-things/clusterbook/compare/v1.21.0...v1.21.1) (2026-03-19)
 
 
