@@ -1324,7 +1324,7 @@ const ipTablePartial = `<table>
                         <option value="ASSIGNED" {{if hasPrefix .Status "ASSIGNED"}}selected{{end}}>ASSIGNED</option>
                         <option value="PENDING" {{if hasPrefix .Status "PENDING"}}selected{{end}}>PENDING</option>
                     </select>
-                    <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: #94a3b8; cursor: pointer;"><input type="checkbox" name="create_dns" {{if hasSuffix .Status ":DNS"}}checked{{end}} style="accent-color: #6366f1;"> DNS</label>
+                    <label style="display: flex; align-items: center; gap: 0.15rem; font-size: 0.75rem; color: #94a3b8; cursor: pointer; white-space: nowrap;"><input type="checkbox" name="create_dns" {{if hasSuffix .Status ":DNS"}}checked{{end}} style="accent-color: #6366f1; margin-right: 0.15rem;"> DNS</label>
                     <button type="submit" class="btn btn-assign">Save</button>
                 </form>
                 <form class="form-inline" hx-post="/htmx/release" hx-target="#ip-table" hx-swap="innerHTML">
@@ -1341,7 +1341,7 @@ const ipTablePartial = `<table>
                         <option value="ASSIGNED">ASSIGNED</option>
                         <option value="PENDING">PENDING</option>
                     </select>
-                    <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: #94a3b8; cursor: pointer;"><input type="checkbox" name="create_dns" style="accent-color: #6366f1;"> DNS</label>
+                    <label style="display: flex; align-items: center; gap: 0.15rem; font-size: 0.75rem; color: #94a3b8; cursor: pointer; white-space: nowrap;"><input type="checkbox" name="create_dns" style="accent-color: #6366f1; margin-right: 0.15rem;"> DNS</label>
                     <button type="submit" class="btn btn-assign">Assign</button>
                 </form>
                 {{end}}

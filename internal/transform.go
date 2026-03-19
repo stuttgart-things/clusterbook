@@ -66,7 +66,14 @@ func ConvertFromCRFormat(data map[string][]string) map[string]IPs {
 			if len(parts) > 1 {
 				info.Status = parts[1]
 				if len(parts) > 2 {
-					info.Cluster = parts[2]
+					// Handle status suffix like "ASSIGNED:DNS" where DNS is part of the status
+					// CR format: "digit:STATUS:DNS:cluster" (4 parts) or "digit:STATUS:cluster" (3 parts)
+					if len(parts) == 4 {
+						info.Status = parts[1] + ":" + parts[2]
+						info.Cluster = parts[3]
+					} else {
+						info.Cluster = parts[2]
+					}
 				}
 			}
 
