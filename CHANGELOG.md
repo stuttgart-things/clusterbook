@@ -1,3 +1,10 @@
+## [1.20.2](https://github.com/stuttgart-things/clusterbook/compare/v1.20.1...v1.20.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* handle DNS status suffix in CR format deserialization ([e7977bb](https://github.com/stuttgart-things/clusterbook/commit/e7977bb150ddc4a66fb0d762fdd8bc9c8391ff62))
+
 ## [1.20.1](https://github.com/stuttgart-things/clusterbook/compare/v1.20.0...v1.20.1) (2026-03-15)
 
 
