@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/stuttgart-things/clusterbook/compare/v1.20.3...v1.21.0) (2026-03-19)
+
+
+### Features
+
+* add DNS test button to verify wildcard record resolution ([dd96342](https://github.com/stuttgart-things/clusterbook/commit/dd9634269d9ab4901476641b629d8c31667a8280))
+
 ## [1.20.3](https://github.com/stuttgart-things/clusterbook/compare/v1.20.2...v1.20.3) (2026-03-19)
 
 
