@@ -1082,16 +1082,16 @@ func handleHTMXTestDNS(w http.ResponseWriter, r *http.Request, pdns *PDNSClient)
 		return
 	}
 
-	resolved, match, err := pdns.TestDNS(cluster, expectedIP)
+	fqdn, resolved, match, err := pdns.TestDNS(cluster, expectedIP)
 	if err != nil {
 		fmt.Fprintf(w, `<span style="color:#ef4444;font-size:0.75rem;" title="%s">DNS FAIL</span>`, err.Error())
 		return
 	}
 
 	if match {
-		fmt.Fprintf(w, `<span style="color:#4ade80;font-size:0.75rem;">DNS OK (%s)</span>`, resolved)
+		fmt.Fprintf(w, `<span style="color:#4ade80;font-size:0.75rem;">%s → %s</span>`, fqdn, resolved)
 	} else {
-		fmt.Fprintf(w, `<span style="color:#ef4444;font-size:0.75rem;">MISMATCH: got %s</span>`, resolved)
+		fmt.Fprintf(w, `<span style="color:#ef4444;font-size:0.75rem;">%s → %s (expected %s)</span>`, fqdn, resolved, expectedIP)
 	}
 }
 
