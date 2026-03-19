@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -114,6 +115,30 @@ func (c *PDNSClient) DeleteRecord(cluster string) {
 	}
 
 	c.patchZone(payload, "DELETE", fqdn, "")
+}
+
+// TestDNS resolves test.{cluster}.{zone} and checks if it matches the expected IP.
+// Returns (resolvedIP, match, error).
+func (c *PDNSClient) TestDNS(cluster, expectedIP string) (string, bool, error) {
+	if c == nil {
+		return "", false, fmt.Errorf("PDNS not enabled")
+	}
+
+	zone := strings.TrimSuffix(c.Zone, ".")
+	fqdn := fmt.Sprintf("test.%s.%s", cluster, zone)
+
+	ips, err := net.LookupHost(fqdn)
+	if err != nil {
+		return "", false, fmt.Errorf("lookup %s: %w", fqdn, err)
+	}
+
+	for _, ip := range ips {
+		if ip == expectedIP {
+			return ip, true, nil
+		}
+	}
+
+	return strings.Join(ips, ","), false, nil
 }
 
 // patchZone sends the PATCH request to PowerDNS

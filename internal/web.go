@@ -113,6 +113,9 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 	mux.HandleFunc("POST /htmx/delete-network", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXDeleteNetwork(w, r, loadFrom, configLoc, configNm)
 	})
+	mux.HandleFunc("POST /htmx/test-dns", func(w http.ResponseWriter, r *http.Request) {
+		handleHTMXTestDNS(w, r, pdns)
+	})
 
 	log.Printf("HTTP/HTMX SERVER LISTENING AT :%s", httpPort)
 	if err := http.ListenAndServe(":"+httpPort, mux); err != nil {
@@ -1065,6 +1068,33 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	}{networkKey, entries})
 }
 
+func handleHTMXTestDNS(w http.ResponseWriter, r *http.Request, pdns *PDNSClient) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	cluster := r.FormValue("cluster")
+	expectedIP := r.FormValue("expected_ip")
+
+	if cluster == "" || expectedIP == "" {
+		fmt.Fprintf(w, `<span style="color:#f97316;font-size:0.75rem;">missing params</span>`)
+		return
+	}
+
+	resolved, match, err := pdns.TestDNS(cluster, expectedIP)
+	if err != nil {
+		fmt.Fprintf(w, `<span style="color:#ef4444;font-size:0.75rem;" title="%s">DNS FAIL</span>`, err.Error())
+		return
+	}
+
+	if match {
+		fmt.Fprintf(w, `<span style="color:#4ade80;font-size:0.75rem;">DNS OK (%s)</span>`, resolved)
+	} else {
+		fmt.Fprintf(w, `<span style="color:#ef4444;font-size:0.75rem;">MISMATCH: got %s</span>`, resolved)
+	}
+}
+
 func handleHTMXDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -1307,8 +1337,8 @@ const ipTablePartial = `<table>
         <tr>
             <td style="font-family: monospace;">{{.IP}}</td>
             <td>
-                {{if hasPrefix .Status "ASSIGNED"}}<span class="badge badge-assigned">ASSIGNED</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span>{{end}}
-                {{else if hasPrefix .Status "PENDING"}}<span class="badge badge-pending">PENDING</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span>{{end}}
+                {{if hasPrefix .Status "ASSIGNED"}}<span class="badge badge-assigned">ASSIGNED</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span> <span id="dns-test-{{.Digit}}" style="display:inline;"><button class="btn" style="background:#334155;color:#60a5fa;font-size:0.6rem;padding:0.2rem 0.4rem;" hx-post="/htmx/test-dns" hx-vals='{"cluster":"{{.Cluster}}","expected_ip":"{{.IP}}"}' hx-target="#dns-test-{{.Digit}}" hx-swap="innerHTML">Test</button></span>{{end}}
+                {{else if hasPrefix .Status "PENDING"}}<span class="badge badge-pending">PENDING</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span> <span id="dns-test-{{.Digit}}" style="display:inline;"><button class="btn" style="background:#334155;color:#60a5fa;font-size:0.6rem;padding:0.2rem 0.4rem;" hx-post="/htmx/test-dns" hx-vals='{"cluster":"{{.Cluster}}","expected_ip":"{{.IP}}"}' hx-target="#dns-test-{{.Digit}}" hx-swap="innerHTML">Test</button></span>{{end}}
                 {{else}}<span class="badge badge-available">AVAILABLE</span>
                 {{end}}
             </td>
