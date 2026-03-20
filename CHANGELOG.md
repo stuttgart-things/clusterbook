@@ -1,3 +1,10 @@
+## [1.21.3](https://github.com/stuttgart-things/clusterbook/compare/v1.21.2...v1.21.3) (2026-03-20)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/fatih/color to v1.19.0 ([bc430c4](https://github.com/stuttgart-things/clusterbook/commit/bc430c4dacc7ace0db4281168b040ad3f5fcf207))
+
 ## [1.21.2](https://github.com/stuttgart-things/clusterbook/compare/v1.21.1...v1.21.2) (2026-03-19)
 
 
