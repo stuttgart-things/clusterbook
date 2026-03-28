@@ -48,6 +48,13 @@ schema ClusterBook:
     pdnsToken: str = ""
     pdnsZone: str = ""
 
+    # DD-WRT integration
+    ddwrtEnabled: bool = False
+    ddwrtHost: str = ""
+    ddwrtUser: str = ""
+    ddwrtPassword: str = ""
+    ddwrtZone: str = ""
+
     # RBAC
     networkConfigApiGroup: str = "github.stuttgart-things.com"
 

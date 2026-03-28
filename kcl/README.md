@@ -1,6 +1,6 @@
 # clusterbook / KCL Deployment
 
-KCL-based Kubernetes manifests for clusterbook. Renders Namespace, ServiceAccount, ConfigMap, Secret (for PDNS credentials), Role/RoleBinding, Deployment (dual-port: gRPC + HTTP), Services, and optional HTTPRoute (Gateway API).
+KCL-based Kubernetes manifests for clusterbook. Renders Namespace, ServiceAccount, ConfigMap, Secrets (for PDNS/DD-WRT credentials), Role/RoleBinding, Deployment (dual-port: gRPC + HTTP), Services, and optional HTTPRoute (Gateway API).
 
 ## Render Manifests
 
@@ -77,6 +77,11 @@ kcl run -D 'config.httpRouteEnabled=true' \
 | `config.pdnsURL` | *(empty)* | PowerDNS API base URL |
 | `config.pdnsToken` | *(empty)* | PowerDNS API key (stored in Secret) |
 | `config.pdnsZone` | *(empty)* | PowerDNS DNS zone |
+| `config.ddwrtEnabled` | `false` | Enable DD-WRT DNS integration |
+| `config.ddwrtHost` | *(empty)* | DD-WRT router IP/hostname |
+| `config.ddwrtUser` | *(empty)* | SSH user for DD-WRT |
+| `config.ddwrtPassword` | *(empty)* | SSH password (stored in Secret) |
+| `config.ddwrtZone` | *(empty)* | DNS zone (e.g. `sthings.lab`) |
 | `config.cpuRequest` | `50m` | CPU request |
 | `config.cpuLimit` | `100m` | CPU limit |
 | `config.memoryRequest` | `64Mi` | Memory request |
@@ -132,6 +137,20 @@ config.pdnsToken: my-api-key
 config.pdnsZone: sthings.io
 ```
 
+### With DD-WRT DNS integration
+
+```yaml
+---
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
+config.namespace: clusterbook
+config.configName: networks-labul
+config.ddwrtEnabled: true
+config.ddwrtHost: 192.168.1.1
+config.ddwrtUser: root
+config.ddwrtPassword: my-router-password
+config.ddwrtZone: sthings.lab
+```
+
 ## Rendered Resources
 
 | Resource | Name | Conditional |
@@ -145,4 +164,5 @@ config.pdnsZone: sthings.io
 | Service (gRPC) | `{name}` | Always |
 | Service (HTTP) | `{name}-http` | Always |
 | Secret | `{name}-pdns` | Only if `pdnsEnabled=true` |
+| Secret | `{name}-ddwrt` | Only if `ddwrtEnabled=true` |
 | HTTPRoute | `{name}` | Only if `httpRouteEnabled=true` |

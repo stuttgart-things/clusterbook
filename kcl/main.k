@@ -21,6 +21,7 @@ manifests = [
         serviceaccount.serviceAccount
         configmap.configMap
         secret.pdnsSecret
+        secret.ddwrtSecret
         rbac.role
         rbac.roleBinding
         deploy.deployment
