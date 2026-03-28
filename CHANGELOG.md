@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/stuttgart-things/clusterbook/compare/v1.22.0...v1.23.0) (2026-03-28)
+
+
+### Features
+
+* add DD-WRT support to KCL deployment and docs ([4633648](https://github.com/stuttgart-things/clusterbook/commit/46336489443d83f13b2a6450e38ffafd4b357577))
+
 # [1.22.0](https://github.com/stuttgart-things/clusterbook/compare/v1.21.3...v1.22.0) (2026-03-28)
 
 
