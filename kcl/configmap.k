@@ -23,5 +23,9 @@ configMap = {
         PDNS_ENABLED: str(config.pdnsEnabled).lower()
         PDNS_URL: config.pdnsURL
         PDNS_ZONE: config.pdnsZone
+        DDWRT_ENABLED: str(config.ddwrtEnabled).lower()
+        DDWRT_HOST: config.ddwrtHost
+        DDWRT_USER: config.ddwrtUser
+        DDWRT_ZONE: config.ddwrtZone
     }
 }

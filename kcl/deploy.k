@@ -61,7 +61,13 @@ deployment = {
                                     name: "{}-pdns".format(config.name)
                                 }
                             }
-                        ] if config.pdnsEnabled else [])
+                        ] if config.pdnsEnabled else []) + ([
+                            {
+                                secretRef: {
+                                    name: "{}-ddwrt".format(config.name)
+                                }
+                            }
+                        ] if config.ddwrtEnabled else [])
                         resources: {
                             requests: {
                                 cpu: config.cpuRequest

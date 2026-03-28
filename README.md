@@ -23,6 +23,7 @@ gitops cluster configuration management
 | HTMX Dashboard | Web UI for IP pool visualization and management |
 | Dual Storage | Filesystem (YAML) or Kubernetes CRD backend |
 | PowerDNS Integration | Optional DNS record management for IP assignments |
+| DD-WRT Integration | Optional DNS via DD-WRT router (SSH + dnsmasq) |
 | KCL Manifests | Type-safe Kubernetes deployment with KCL |
 
 ## DEPLOYMENT
@@ -288,6 +289,66 @@ EOF
 | `PDNS_URL` | PowerDNS API URL | - |
 | `PDNS_TOKEN` | PowerDNS API token | - |
 | `PDNS_ZONE` | PowerDNS zone for records | - |
+| `DDWRT_ENABLED` | Enable DD-WRT DNS integration | `false` |
+| `DDWRT_HOST` | DD-WRT router IP/hostname | - |
+| `DDWRT_USER` | SSH user for DD-WRT | - |
+| `DDWRT_PASSWORD` | SSH password for DD-WRT | - |
+| `DDWRT_ZONE` | DNS zone (e.g. `sthings.lab`) | - |
+
+## DNS PROVIDERS
+
+Both DNS providers are optional and can run simultaneously. Enable them via env vars. Records are created/deleted when `create_dns: true` is passed during assign/release.
+
+<details><summary>POWERDNS</summary>
+
+Creates wildcard A records (`*.cluster.zone`) via the PowerDNS REST API.
+
+```bash
+PDNS_ENABLED=true
+PDNS_URL=http://pdns.sthings.lab:8081
+PDNS_TOKEN=your-api-key
+PDNS_ZONE=sthings.lab.
+```
+
+</details>
+
+<details><summary>DD-WRT</summary>
+
+Manages `dnsmasq` address entries on a DD-WRT router via SSH + `nvram`. Creates entries like `address=/cluster.zone/ip`.
+
+```bash
+DDWRT_ENABLED=true
+DDWRT_HOST=192.168.1.1
+DDWRT_USER=root
+DDWRT_PASSWORD=your-router-password
+DDWRT_ZONE=sthings.lab
+```
+
+**Credential handling in Kubernetes:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clusterbook-ddwrt
+type: Opaque
+stringData:
+  DDWRT_ENABLED: "true"
+  DDWRT_HOST: "192.168.1.1"
+  DDWRT_USER: "root"
+  DDWRT_PASSWORD: "your-router-password"
+  DDWRT_ZONE: "sthings.lab"
+```
+
+Reference in the deployment:
+
+```yaml
+envFrom:
+  - secretRef:
+      name: clusterbook-ddwrt
+```
+
+</details>
 
 ## DEV TASKS
 
@@ -327,6 +388,13 @@ CONFIG_NAME=networks-labul #resource-name
 
 SERVER_PORT=50051
 HTTP_PORT=8080
+
+# DD-WRT DNS (optional)
+#DDWRT_ENABLED=true
+#DDWRT_HOST=192.168.1.1
+#DDWRT_USER=root
+#DDWRT_PASSWORD=secret
+#DDWRT_ZONE=sthings.lab
 
 #CLUSTERBOOK_SERVER=localhost:50051
 #SECURE_CONNECTION=false

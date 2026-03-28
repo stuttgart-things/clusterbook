@@ -20,6 +20,11 @@ _pdnsEnabled = option("config.pdnsEnabled")
 _pdnsURL = option("config.pdnsURL")
 _pdnsToken = option("config.pdnsToken")
 _pdnsZone = option("config.pdnsZone")
+_ddwrtEnabled = option("config.ddwrtEnabled")
+_ddwrtHost = option("config.ddwrtHost")
+_ddwrtUser = option("config.ddwrtUser")
+_ddwrtPassword = option("config.ddwrtPassword")
+_ddwrtZone = option("config.ddwrtZone")
 
 # Config instance with command-line overrides
 config: schema.ClusterBook = schema.ClusterBook {
@@ -53,6 +58,16 @@ config: schema.ClusterBook = schema.ClusterBook {
         pdnsToken = _pdnsToken
     if _pdnsZone:
         pdnsZone = _pdnsZone
+    if _ddwrtEnabled:
+        ddwrtEnabled = _ddwrtEnabled in [True, "True", "true"]
+    if _ddwrtHost:
+        ddwrtHost = _ddwrtHost
+    if _ddwrtUser:
+        ddwrtUser = _ddwrtUser
+    if _ddwrtPassword:
+        ddwrtPassword = _ddwrtPassword
+    if _ddwrtZone:
+        ddwrtZone = _ddwrtZone
 }
 
 # Common labels applied to all resources
