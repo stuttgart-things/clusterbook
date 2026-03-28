@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/stuttgart-things/clusterbook/compare/v1.21.3...v1.22.0) (2026-03-28)
+
+
+### Features
+
+* add DD-WRT DNSMasq DNS provider via SSH ([e3272be](https://github.com/stuttgart-things/clusterbook/commit/e3272be4d9efc9c81dc29a7403892da01cf9ed2e)), closes [#115](https://github.com/stuttgart-things/clusterbook/issues/115)
+
 ## [1.21.3](https://github.com/stuttgart-things/clusterbook/compare/v1.21.2...v1.21.3) (2026-03-20)
 
 
