@@ -33,7 +33,7 @@ type IPEntry struct {
 }
 
 // StartWebServer starts the HTTP server for HTMX frontend and REST API
-func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	mux := http.NewServeMux()
 
 	// HTMX frontend routes
@@ -52,13 +52,13 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleAPINetworkIPs(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("POST /api/v1/networks/{key}/assign", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIAssign(w, r, loadFrom, configLoc, configNm, pdns)
+		handleAPIAssign(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 	mux.HandleFunc("POST /api/v1/networks/{key}/reserve", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIReserve(w, r, loadFrom, configLoc, configNm, pdns)
+		handleAPIReserve(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 	mux.HandleFunc("POST /api/v1/networks/{key}/release", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIRelease(w, r, loadFrom, configLoc, configNm, pdns)
+		handleAPIRelease(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 
 	// REST API CRUD routes
@@ -75,12 +75,12 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleAPIAddIP(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("DELETE /api/v1/networks/{key}/ips/{ip}", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIDeleteIP(w, r, loadFrom, configLoc, configNm, pdns)
+		handleAPIDeleteIP(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 
 	// Edit (update) existing assignment
 	mux.HandleFunc("PUT /api/v1/networks/{key}/ips/{ip}", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIEditIP(w, r, loadFrom, configLoc, configNm, pdns)
+		handleAPIEditIP(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 
 	// Cluster info routes
@@ -93,10 +93,10 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 
 	// HTMX partial routes
 	mux.HandleFunc("POST /htmx/assign", func(w http.ResponseWriter, r *http.Request) {
-		handleHTMXAssign(w, r, loadFrom, configLoc, configNm, pdns)
+		handleHTMXAssign(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 	mux.HandleFunc("POST /htmx/release", func(w http.ResponseWriter, r *http.Request) {
-		handleHTMXRelease(w, r, loadFrom, configLoc, configNm, pdns)
+		handleHTMXRelease(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 	mux.HandleFunc("POST /htmx/add-network", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXAddNetwork(w, r, loadFrom, configLoc, configNm)
@@ -105,10 +105,10 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleHTMXAddIP(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("POST /htmx/delete-ip", func(w http.ResponseWriter, r *http.Request) {
-		handleHTMXDeleteIP(w, r, loadFrom, configLoc, configNm, pdns)
+		handleHTMXDeleteIP(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 	mux.HandleFunc("POST /htmx/edit", func(w http.ResponseWriter, r *http.Request) {
-		handleHTMXEdit(w, r, loadFrom, configLoc, configNm, pdns)
+		handleHTMXEdit(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 	mux.HandleFunc("POST /htmx/delete-network", func(w http.ResponseWriter, r *http.Request) {
 		handleHTMXDeleteNetwork(w, r, loadFrom, configLoc, configNm)
@@ -217,7 +217,7 @@ func handleNetworkDetail(w http.ResponseWriter, r *http.Request, loadFrom, confi
 	}
 }
 
-func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -260,6 +260,9 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 
 	if createDNS {
 		pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
+		if ddwrt != nil {
+			ddwrt.CreateRecord(cluster, ipKey+"."+ipDigit)
+		}
 	}
 
 	// Re-render the network detail table
@@ -272,7 +275,7 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	}{networkKey, entries})
 }
 
-func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -306,6 +309,9 @@ func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configL
 
 	if hadDNS {
 		pdns.DeleteRecord(prevCluster)
+		if ddwrt != nil {
+			ddwrt.DeleteRecord(prevCluster)
+		}
 	}
 
 	// Re-render the network detail table
@@ -343,7 +349,7 @@ func handleAPINetworkIPs(w http.ResponseWriter, r *http.Request, loadFrom, confi
 	json.NewEncoder(w).Encode(entries)
 }
 
-func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	networkKey := r.PathValue("key")
 
 	var req struct {
@@ -392,6 +398,9 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 
 	if req.CreateDNS {
 		pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
+		if ddwrt != nil {
+			ddwrt.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -402,7 +411,7 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 }
 
 // handleAPIReserve finds an available IP in the network, assigns it to the cluster, and returns the full IP.
-func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	networkKey := r.PathValue("key")
 
 	var req struct {
@@ -462,6 +471,9 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 
 	if req.CreateDNS {
 		pdns.CreateRecord(req.Cluster, fullIP)
+		if ddwrt != nil {
+			ddwrt.CreateRecord(req.Cluster, fullIP)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -473,7 +485,7 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	})
 }
 
-func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	networkKey := r.PathValue("key")
 
 	var req struct {
@@ -509,6 +521,9 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 
 	if hadDNS {
 		pdns.DeleteRecord(prevCluster)
+		if ddwrt != nil {
+			ddwrt.DeleteRecord(prevCluster)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -713,7 +728,7 @@ func handleAPIAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	})
 }
 
-func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	networkKey := r.PathValue("key")
 	ip := r.PathValue("ip")
 
@@ -740,6 +755,9 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 
 	if hadDNS {
 		pdns.DeleteRecord(prevCluster)
+		if ddwrt != nil {
+			ddwrt.DeleteRecord(prevCluster)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -749,7 +767,7 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	})
 }
 
-func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	networkKey := r.PathValue("key")
 	ipDigit := r.PathValue("ip")
 
@@ -798,9 +816,15 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	// Handle DNS changes
 	if hadDNS && (!req.CreateDNS || prevCluster != req.Cluster) {
 		pdns.DeleteRecord(prevCluster)
+		if ddwrt != nil {
+			ddwrt.DeleteRecord(prevCluster)
+		}
 	}
 	if req.CreateDNS && (!hadDNS || prevCluster != req.Cluster) {
 		pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
+		if ddwrt != nil {
+			ddwrt.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -962,7 +986,7 @@ func handleHTMXAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	}{networkKey, entries})
 }
 
-func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -994,6 +1018,9 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 
 	if hadDNS {
 		pdns.DeleteRecord(prevCluster)
+		if ddwrt != nil {
+			ddwrt.DeleteRecord(prevCluster)
+		}
 	}
 
 	// Re-render the IP table
@@ -1005,7 +1032,7 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 	}{networkKey, entries})
 }
 
-func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient) {
+func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1053,9 +1080,15 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	// Handle DNS changes
 	if hadDNS && (!createDNS || prevCluster != cluster) {
 		pdns.DeleteRecord(prevCluster)
+		if ddwrt != nil {
+			ddwrt.DeleteRecord(prevCluster)
+		}
 	}
 	if createDNS && (!hadDNS || prevCluster != cluster) {
 		pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
+		if ddwrt != nil {
+			ddwrt.CreateRecord(cluster, ipKey+"."+ipDigit)
+		}
 	}
 
 	// Re-render the network detail table
