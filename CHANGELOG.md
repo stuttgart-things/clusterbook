@@ -1,3 +1,10 @@
+## [1.23.1](https://github.com/stuttgart-things/clusterbook/compare/v1.23.0...v1.23.1) (2026-03-29)
+
+
+### Bug Fixes
+
+* strip network prefix from IP path value in PUT/DELETE handlers ([d72a4a5](https://github.com/stuttgart-things/clusterbook/commit/d72a4a53a581c54243de529e2a143cfc10ffb58d)), closes [#139](https://github.com/stuttgart-things/clusterbook/issues/139)
+
 # [1.23.0](https://github.com/stuttgart-things/clusterbook/compare/v1.22.0...v1.23.0) (2026-03-28)
 
 
