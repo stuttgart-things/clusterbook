@@ -731,6 +731,10 @@ func handleAPIAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	networkKey := r.PathValue("key")
 	ip := r.PathValue("ip")
+	// Support both full IP (10.31.104.5) and host-part only (5)
+	if strings.HasPrefix(ip, networkKey+".") {
+		ip = strings.TrimPrefix(ip, networkKey+".")
+	}
 
 	ipList := LoadProfile(loadFrom, configLoc, configNm)
 
@@ -770,6 +774,10 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	networkKey := r.PathValue("key")
 	ipDigit := r.PathValue("ip")
+	// Support both full IP (10.31.104.5) and host-part only (5)
+	if strings.HasPrefix(ipDigit, networkKey+".") {
+		ipDigit = strings.TrimPrefix(ipDigit, networkKey+".")
+	}
 
 	var req struct {
 		Cluster   string `json:"cluster"`
