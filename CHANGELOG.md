@@ -1,3 +1,10 @@
+## [1.23.2](https://github.com/stuttgart-things/clusterbook/compare/v1.23.1...v1.23.2) (2026-03-29)
+
+
+### Bug Fixes
+
+* accept createDNS field and fix status in PUT edit response ([f4410d8](https://github.com/stuttgart-things/clusterbook/commit/f4410d869b3278417d48a7d6a41e703bda61a0fa)), closes [#141](https://github.com/stuttgart-things/clusterbook/issues/141)
+
 ## [1.23.1](https://github.com/stuttgart-things/clusterbook/compare/v1.23.0...v1.23.1) (2026-03-29)
 
 
