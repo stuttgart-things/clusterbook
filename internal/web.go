@@ -780,14 +780,20 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	}
 
 	var req struct {
-		Cluster   string `json:"cluster"`
-		Status    string `json:"status"`
-		CreateDNS bool   `json:"create_dns"`
+		Cluster      string `json:"cluster"`
+		Status       string `json:"status"`
+		CreateDNS    bool   `json:"create_dns"`
+		CreateDNSAlt bool   `json:"createDNS"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
 		return
+	}
+
+	// Accept both "create_dns" and "createDNS" field names
+	if req.CreateDNSAlt {
+		req.CreateDNS = true
 	}
 
 	if req.Cluster == "" || req.Status == "" {
@@ -838,7 +844,7 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
-		"message": fmt.Sprintf("IP %s.%s updated: cluster=%s status=%s", networkKey, ipDigit, req.Cluster, req.Status),
+		"message": fmt.Sprintf("IP %s.%s updated: cluster=%s status=%s", networkKey, ipDigit, req.Cluster, entry.Status),
 	})
 }
 
