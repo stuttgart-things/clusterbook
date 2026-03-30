@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/stuttgart-things/clusterbook/compare/v1.23.2...v1.24.0) (2026-03-30)
+
+
+### Features
+
+* add FQDN and zone fields to cluster and IP API responses ([52358c1](https://github.com/stuttgart-things/clusterbook/commit/52358c15367e618a8bafe1e7acd83b2f0e7f8e00))
+
 ## [1.23.2](https://github.com/stuttgart-things/clusterbook/compare/v1.23.1...v1.23.2) (2026-03-29)
 
 
