@@ -26,10 +26,31 @@ type NetworkPoolInfo struct {
 
 // IPEntry holds a single IP entry for display
 type IPEntry struct {
-	IP      string
-	Digit   string
-	Status  string
-	Cluster string
+	IP      string `json:"ip"`
+	Digit   string `json:"digit"`
+	Status  string `json:"status"`
+	Cluster string `json:"cluster"`
+	FQDN    string `json:"fqdn,omitempty"`
+}
+
+// dnsZone returns the configured DNS zone (without trailing dot) from PDNS or DDWRT.
+// Returns empty string if neither is configured.
+func dnsZone(pdns *PDNSClient, ddwrt *DDWRTClient) string {
+	if pdns != nil {
+		return strings.TrimSuffix(pdns.Zone, ".")
+	}
+	if ddwrt != nil {
+		return ddwrt.Zone
+	}
+	return ""
+}
+
+// buildFQDN returns the wildcard FQDN for a cluster given a DNS zone.
+func buildFQDN(cluster, zone string) string {
+	if cluster == "" || zone == "" {
+		return ""
+	}
+	return fmt.Sprintf("*.%s.%s", cluster, zone)
 }
 
 // StartWebServer starts the HTTP server for HTMX frontend and REST API
@@ -49,7 +70,7 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleAPINetworks(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("GET /api/v1/networks/{key}/ips", func(w http.ResponseWriter, r *http.Request) {
-		handleAPINetworkIPs(w, r, loadFrom, configLoc, configNm)
+		handleAPINetworkIPs(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
 	})
 	mux.HandleFunc("POST /api/v1/networks/{key}/assign", func(w http.ResponseWriter, r *http.Request) {
 		handleAPIAssign(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
@@ -88,7 +109,12 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleAPIClusters(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("GET /api/v1/clusters/{name}", func(w http.ResponseWriter, r *http.Request) {
-		handleAPIClusterInfo(w, r, loadFrom, configLoc, configNm)
+		handleAPIClusterInfo(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
+	})
+
+	// Zone info endpoint
+	mux.HandleFunc("GET /api/v1/zone", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIZone(w, r, pdns, ddwrt)
 	})
 
 	// HTMX partial routes
@@ -334,7 +360,7 @@ func handleAPINetworks(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	json.NewEncoder(w).Encode(pools)
 }
 
-func handleAPINetworkIPs(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+func handleAPINetworkIPs(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	networkKey := r.PathValue("key")
 	ipList := LoadProfile(loadFrom, configLoc, configNm)
 
@@ -344,7 +370,14 @@ func handleAPINetworkIPs(w http.ResponseWriter, r *http.Request, loadFrom, confi
 		return
 	}
 
+	zone := dnsZone(pdns, ddwrt)
 	entries := getIPEntries(ips, networkKey)
+	for i := range entries {
+		if strings.Contains(entries[i].Status, ":DNS") && entries[i].Cluster != "" {
+			entries[i].FQDN = buildFQDN(entries[i].Cluster, zone)
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(entries)
 }
@@ -880,7 +913,7 @@ func handleAPIClusters(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	json.NewEncoder(w).Encode(result)
 }
 
-func handleAPIClusterInfo(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+func handleAPIClusterInfo(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	clusterName := r.PathValue("name")
 	ipList := LoadProfile(loadFrom, configLoc, configNm)
 
@@ -891,6 +924,7 @@ func handleAPIClusterInfo(w http.ResponseWriter, r *http.Request, loadFrom, conf
 	}
 
 	var ips []ipInfo
+	hasDNS := false
 	for networkKey, network := range ipList {
 		for ipDigit, entry := range network {
 			if entry.Cluster == clusterName {
@@ -899,6 +933,9 @@ func handleAPIClusterInfo(w http.ResponseWriter, r *http.Request, loadFrom, conf
 					IP:      networkKey + "." + ipDigit,
 					Status:  entry.Status,
 				})
+				if strings.Contains(entry.Status, ":DNS") {
+					hasDNS = true
+				}
 			}
 		}
 	}
@@ -908,11 +945,50 @@ func handleAPIClusterInfo(w http.ResponseWriter, r *http.Request, loadFrom, conf
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	zone := dnsZone(pdns, ddwrt)
+	result := map[string]interface{}{
 		"cluster": clusterName,
 		"ips":     ips,
-	})
+	}
+	if hasDNS && zone != "" {
+		result["fqdn"] = buildFQDN(clusterName, zone)
+		result["zone"] = zone
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func handleAPIZone(w http.ResponseWriter, r *http.Request, pdns *PDNSClient, ddwrt *DDWRTClient) {
+	type providerInfo struct {
+		Enabled bool   `json:"enabled"`
+		Zone    string `json:"zone,omitempty"`
+	}
+
+	result := map[string]providerInfo{
+		"pdns": {
+			Enabled: pdns != nil,
+		},
+		"ddwrt": {
+			Enabled: ddwrt != nil,
+		},
+	}
+
+	if pdns != nil {
+		result["pdns"] = providerInfo{
+			Enabled: true,
+			Zone:    strings.TrimSuffix(pdns.Zone, "."),
+		}
+	}
+	if ddwrt != nil {
+		result["ddwrt"] = providerInfo{
+			Enabled: true,
+			Zone:    ddwrt.Zone,
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
 
 // --- HTMX CRUD Handlers ---
