@@ -80,7 +80,7 @@ func TestHandleAPIClusterInfo(t *testing.T) {
 		req.SetPathValue("name", "mycluster")
 		w := httptest.NewRecorder()
 
-		handleAPIClusterInfo(w, req, "disk", dir, name)
+		handleAPIClusterInfo(w, req, "disk", dir, name, nil, nil)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
@@ -111,10 +111,189 @@ func TestHandleAPIClusterInfo(t *testing.T) {
 		req.SetPathValue("name", "doesnotexist")
 		w := httptest.NewRecorder()
 
-		handleAPIClusterInfo(w, req, "disk", dir, name)
+		handleAPIClusterInfo(w, req, "disk", dir, name, nil, nil)
 
 		if w.Code != http.StatusNotFound {
 			t.Errorf("expected 404, got %d", w.Code)
+		}
+	})
+
+	t.Run("includes fqdn and zone with PDNS provider", func(t *testing.T) {
+		pdns := &PDNSClient{Zone: "sthings-vsphere.labul.sva.de."}
+		req := httptest.NewRequest("GET", "/api/v1/clusters/mycluster", nil)
+		req.SetPathValue("name", "mycluster")
+		w := httptest.NewRecorder()
+
+		handleAPIClusterInfo(w, req, "disk", dir, name, pdns, nil)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+
+		var result struct {
+			Cluster string `json:"cluster"`
+			FQDN    string `json:"fqdn"`
+			Zone    string `json:"zone"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+			t.Fatalf("decode error: %v", err)
+		}
+
+		expectedFQDN := "*.mycluster.sthings-vsphere.labul.sva.de"
+		if result.FQDN != expectedFQDN {
+			t.Errorf("expected fqdn %q, got %q", expectedFQDN, result.FQDN)
+		}
+		if result.Zone != "sthings-vsphere.labul.sva.de" {
+			t.Errorf("expected zone sthings-vsphere.labul.sva.de, got %q", result.Zone)
+		}
+	})
+
+	t.Run("no fqdn without DNS status", func(t *testing.T) {
+		pdns := &PDNSClient{Zone: "sthings.lab."}
+		req := httptest.NewRequest("GET", "/api/v1/clusters/othercluster", nil)
+		req.SetPathValue("name", "othercluster")
+		w := httptest.NewRecorder()
+
+		handleAPIClusterInfo(w, req, "disk", dir, name, pdns, nil)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+
+		var result map[string]interface{}
+		if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+			t.Fatalf("decode error: %v", err)
+		}
+
+		if _, ok := result["fqdn"]; ok {
+			t.Errorf("expected no fqdn field for cluster without DNS, got %v", result["fqdn"])
+		}
+	})
+}
+
+func TestHandleAPINetworkIPsWithFQDN(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+	pdns := &PDNSClient{Zone: "sthings-vsphere.labul.sva.de."}
+
+	req := httptest.NewRequest("GET", "/api/v1/networks/10.31.103/ips", nil)
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	handleAPINetworkIPs(w, req, "disk", dir, name, pdns, nil)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var entries []IPEntry
+	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	fqdnByDigit := map[string]string{}
+	for _, e := range entries {
+		fqdnByDigit[e.Digit] = e.FQDN
+	}
+
+	// digit "5" has ASSIGNED:DNS → should have FQDN
+	expected := "*.mycluster.sthings-vsphere.labul.sva.de"
+	if fqdnByDigit["5"] != expected {
+		t.Errorf("digit 5: expected fqdn %q, got %q", expected, fqdnByDigit["5"])
+	}
+
+	// digit "6" has ASSIGNED (no DNS) → no FQDN
+	if fqdnByDigit["6"] != "" {
+		t.Errorf("digit 6: expected empty fqdn, got %q", fqdnByDigit["6"])
+	}
+
+	// digit "7" is unassigned → no FQDN
+	if fqdnByDigit["7"] != "" {
+		t.Errorf("digit 7: expected empty fqdn, got %q", fqdnByDigit["7"])
+	}
+}
+
+func TestHandleAPIZone(t *testing.T) {
+	t.Run("with PDNS provider", func(t *testing.T) {
+		pdns := &PDNSClient{Zone: "sthings-vsphere.labul.sva.de."}
+		req := httptest.NewRequest("GET", "/api/v1/zone", nil)
+		w := httptest.NewRecorder()
+
+		handleAPIZone(w, req, pdns, nil)
+
+		var result map[string]struct {
+			Enabled bool   `json:"enabled"`
+			Zone    string `json:"zone"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+			t.Fatalf("decode error: %v", err)
+		}
+
+		if !result["pdns"].Enabled {
+			t.Error("expected pdns enabled")
+		}
+		if result["pdns"].Zone != "sthings-vsphere.labul.sva.de" {
+			t.Errorf("expected zone sthings-vsphere.labul.sva.de, got %q", result["pdns"].Zone)
+		}
+		if result["ddwrt"].Enabled {
+			t.Error("expected ddwrt disabled")
+		}
+	})
+
+	t.Run("no providers", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v1/zone", nil)
+		w := httptest.NewRecorder()
+
+		handleAPIZone(w, req, nil, nil)
+
+		var result map[string]struct {
+			Enabled bool   `json:"enabled"`
+			Zone    string `json:"zone"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+			t.Fatalf("decode error: %v", err)
+		}
+
+		if result["pdns"].Enabled || result["ddwrt"].Enabled {
+			t.Error("expected both providers disabled")
+		}
+	})
+}
+
+func TestBuildFQDN(t *testing.T) {
+	tests := []struct {
+		cluster, zone, want string
+	}{
+		{"myapp", "sthings.lab", "*.myapp.sthings.lab"},
+		{"", "sthings.lab", ""},
+		{"myapp", "", ""},
+	}
+	for _, tt := range tests {
+		got := buildFQDN(tt.cluster, tt.zone)
+		if got != tt.want {
+			t.Errorf("buildFQDN(%q, %q) = %q, want %q", tt.cluster, tt.zone, got, tt.want)
+		}
+	}
+}
+
+func TestDnsZone(t *testing.T) {
+	t.Run("prefers PDNS zone", func(t *testing.T) {
+		pdns := &PDNSClient{Zone: "pdns.zone."}
+		ddwrt := &DDWRTClient{Zone: "ddwrt.zone"}
+		if got := dnsZone(pdns, ddwrt); got != "pdns.zone" {
+			t.Errorf("expected pdns.zone, got %q", got)
+		}
+	})
+
+	t.Run("falls back to DDWRT", func(t *testing.T) {
+		ddwrt := &DDWRTClient{Zone: "ddwrt.zone"}
+		if got := dnsZone(nil, ddwrt); got != "ddwrt.zone" {
+			t.Errorf("expected ddwrt.zone, got %q", got)
+		}
+	})
+
+	t.Run("returns empty when both nil", func(t *testing.T) {
+		if got := dnsZone(nil, nil); got != "" {
+			t.Errorf("expected empty, got %q", got)
 		}
 	})
 }
