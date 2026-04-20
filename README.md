@@ -1,16 +1,21 @@
 # stuttgart-things/clusterbook
 
-gitops cluster configuration management
-
 <div align="center">
   <p>
     <img src="https://github.com/stuttgart-things/docs/blob/main/hugo/sthings-argo.png" alt="sthings" width="450" />
   </p>
   <p>
-    <strong>[/ˈklʌstəʳbʊk/]</strong>- gitops cluster configuration management
-
+    <strong>[/ˈklʌstəʳbʊk/]</strong> — IPAM + DNS orchestration for Kubernetes clusters.
+  </p>
+  <p>
+    <a href="https://github.com/stuttgart-things/clusterbook/releases/latest"><img src="https://img.shields.io/github/v/release/stuttgart-things/clusterbook?style=flat-square" alt="release"/></a>
+    <a href="https://github.com/stuttgart-things/clusterbook/blob/main/LICENSE"><img src="https://img.shields.io/github/license/stuttgart-things/clusterbook?style=flat-square" alt="license"/></a>
+    <a href="https://github.com/stuttgart-things/clusterbook/actions/workflows/build-scan-image.yaml"><img src="https://img.shields.io/github/actions/workflow/status/stuttgart-things/clusterbook/build-scan-image.yaml?branch=main&style=flat-square&label=build" alt="build"/></a>
+    <img src="https://img.shields.io/github/go-mod/go-version/stuttgart-things/clusterbook?style=flat-square" alt="go version"/>
   </p>
 </div>
+
+**clusterbook** is a GitOps-friendly IP Address Management (IPAM) service for Kubernetes clusters. It tracks IP pools in YAML or a Kubernetes CRD, exposes them over gRPC / REST / HTMX, and can wire allocations to DNS (PowerDNS or DD-WRT) and leased lifecycles with auto-reclaim. A Crossplane provider is included for declarative, CR-driven IP reservations.
 
 ## FEATURES
 
@@ -18,12 +23,15 @@ gitops cluster configuration management
 |---------|-------------|
 | IP Address Management | Allocate and track IPs across Kubernetes clusters |
 | CIDR-aware Allocation | Define pools as CIDR ranges (e.g. `10.31.103.0/24`) with auto-expansion |
+| Auto-assignment | `/reserve` endpoint picks the next free IP in a pool |
+| IP Leases & Auto-reclaim | Optional TTL on assignments — expired leases are reclaimed in the background (with DNS cleanup) |
 | gRPC API | Programmatic access on port `:50051` |
 | REST API | JSON endpoints on port `:8080` |
 | HTMX Dashboard | Web UI for IP pool visualization and management |
 | Dual Storage | Filesystem (YAML) or Kubernetes CRD backend |
 | PowerDNS Integration | Optional DNS record management for IP assignments |
 | DD-WRT Integration | Optional DNS via DD-WRT router (SSH + dnsmasq) |
+| Crossplane Provider | Declarative `IPAssignment` / `Network` managed resources (see [`provider/`](./provider)) |
 | KCL Manifests | Type-safe Kubernetes deployment with KCL |
 
 ## DEPLOYMENT
@@ -129,6 +137,31 @@ curl http://localhost:8080/api/v1/networks/10.31.103/ips
 curl -X POST http://localhost:8080/api/v1/networks/10.31.103/assign \
   -H "Content-Type: application/json" \
   -d '{"ip": "10.31.103.6", "cluster": "my-cluster", "status": "ASSIGNED"}'
+```
+
+### Reserve (auto-assign the next free IP)
+
+```bash
+curl -X POST http://localhost:8080/api/v1/networks/10.31.103/reserve \
+  -H "Content-Type: application/json" \
+  -d '{"cluster": "my-cluster", "create_dns": true}'
+# → {"ip":"10.31.103.6","digit":"6","status":"ASSIGNED","cluster":"my-cluster"}
+```
+
+### Assign with a lease (auto-reclaim after TTL)
+
+```bash
+curl -X POST http://localhost:8080/api/v1/networks/10.31.103/assign \
+  -H "Content-Type: application/json" \
+  -d '{"ip": "10.31.103.6", "cluster": "ephemeral-cluster", "lease_duration_seconds": 3600}'
+```
+
+### Renew a lease
+
+```bash
+curl -X POST http://localhost:8080/api/v1/networks/10.31.103/ips/10.31.103.6/renew \
+  -H "Content-Type: application/json" \
+  -d '{"lease_duration_seconds": 3600}'
 ```
 
 ### Release an IP
@@ -284,6 +317,7 @@ EOF
 | `CONFIG_NAME` | File name or resource name | - |
 | `SERVER_PORT` | gRPC server port | `50051` |
 | `HTTP_PORT` | HTTP/HTMX server port | `8080` |
+| `RECLAIMER_INTERVAL` | Lease reclaimer scan interval (Go duration, e.g. `60s`, `5m`). Set `0` to disable. | `60s` |
 | `KUBECONFIG` | K8s config path (for CR backend) | - |
 | `PDNS_ENABLED` | Enable PowerDNS integration | `false` |
 | `PDNS_URL` | PowerDNS API URL | - |
@@ -349,6 +383,39 @@ envFrom:
 ```
 
 </details>
+
+## CROSSPLANE PROVIDER
+
+The [`provider/`](./provider) directory contains a Crossplane provider that wraps clusterbook's REST API as declarative managed resources. Point a `ProviderConfig` at a running clusterbook instance, then create `Network` and `IPAssignment` CRs to drive pool creation and IP allocation from Git.
+
+<details><summary>EXAMPLE</summary>
+
+```yaml
+apiVersion: clusterbook.stuttgart-things.com/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  url: http://clusterbook.clusterbook-system:8080
+---
+apiVersion: clusterbook.stuttgart-things.com/v1alpha1
+kind: IPAssignment
+metadata:
+  name: my-cluster-ip
+spec:
+  forProvider:
+    networkKey: "10.31.103"
+    clusterName: "my-cluster"
+    createDNS: true
+  providerConfigRef:
+    name: default
+```
+
+</details>
+
+## LEASES & AUTO-RECLAIM
+
+Assignments can carry a TTL via `lease_duration_seconds` on `/assign` or `/reserve`. A background reclaimer periodically scans for expired leases, frees the IPs, and deletes any associated DNS records. The interval is controlled by `RECLAIMER_INTERVAL` (default `60s`; `0` disables the reclaimer). Leases can be extended via the `/renew` endpoint.
 
 ## DEV TASKS
 
