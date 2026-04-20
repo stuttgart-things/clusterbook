@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func setupTestConfig(t *testing.T, yaml string) (configDir, configName string) {
@@ -257,6 +259,100 @@ func TestHandleAPIZone(t *testing.T) {
 			t.Error("expected both providers disabled")
 		}
 	})
+}
+
+func TestHandleAPIAssignWithLease(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	body := `{"ip":"10.31.103.7","cluster":"newcluster","lease_duration_seconds":3600}`
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/assign", strings.NewReader(body))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	before := time.Now().Unix()
+	handleAPIAssign(w, req, "disk", dir, name, nil, nil)
+	after := time.Now().Unix()
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	ipList := LoadProfile("disk", dir, name)
+	entry := ipList["10.31.103"]["7"]
+	if entry.Status != "ASSIGNED" || entry.Cluster != "newcluster" {
+		t.Errorf("entry not assigned: %+v", entry)
+	}
+	if entry.LeaseExpiresAt < before+3600 || entry.LeaseExpiresAt > after+3600 {
+		t.Errorf("unexpected LeaseExpiresAt: got %d, want within [%d, %d]",
+			entry.LeaseExpiresAt, before+3600, after+3600)
+	}
+}
+
+func TestHandleAPIRenewLease(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	body := `{"lease_duration_seconds":7200}`
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/ips/10.31.103.6/renew", strings.NewReader(body))
+	req.SetPathValue("key", "10.31.103")
+	req.SetPathValue("ip", "10.31.103.6")
+	w := httptest.NewRecorder()
+
+	before := time.Now().Unix()
+	handleAPIRenewLease(w, req, "disk", dir, name)
+	after := time.Now().Unix()
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	ipList := LoadProfile("disk", dir, name)
+	entry := ipList["10.31.103"]["6"]
+	if entry.LeaseExpiresAt < before+7200 || entry.LeaseExpiresAt > after+7200 {
+		t.Errorf("unexpected LeaseExpiresAt after renew: %d", entry.LeaseExpiresAt)
+	}
+}
+
+func TestHandleAPIRenewLeaseRejectsUnassigned(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	body := `{"lease_duration_seconds":3600}`
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/ips/10.31.103.7/renew", strings.NewReader(body))
+	req.SetPathValue("key", "10.31.103")
+	req.SetPathValue("ip", "10.31.103.7")
+	w := httptest.NewRecorder()
+
+	handleAPIRenewLease(w, req, "disk", dir, name)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409 for unassigned IP, got %d", w.Code)
+	}
+}
+
+func TestHandleAPIReleaseClearsLease(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	// First assign with lease
+	assignBody := `{"ip":"10.31.103.7","cluster":"temp","lease_duration_seconds":3600}`
+	assignReq := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/assign", strings.NewReader(assignBody))
+	assignReq.SetPathValue("key", "10.31.103")
+	handleAPIAssign(httptest.NewRecorder(), assignReq, "disk", dir, name, nil, nil)
+
+	// Then release
+	releaseBody := `{"ip":"10.31.103.7"}`
+	releaseReq := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/release", strings.NewReader(releaseBody))
+	releaseReq.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+	handleAPIRelease(w, releaseReq, "disk", dir, name, nil, nil)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	ipList := LoadProfile("disk", dir, name)
+	entry := ipList["10.31.103"]["7"]
+	if entry.LeaseExpiresAt != 0 {
+		t.Errorf("expected lease cleared after release, got %d", entry.LeaseExpiresAt)
+	}
 }
 
 func TestBuildFQDN(t *testing.T) {

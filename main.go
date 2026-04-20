@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/pterm/pterm"
 	"github.com/stuttgart-things/clusterbook/internal"
@@ -44,7 +45,12 @@ var (
 	ddwrtUser      = os.Getenv("DDWRT_USER")
 	ddwrtPassword  = os.Getenv("DDWRT_PASSWORD")
 	ddwrtZone      = os.Getenv("DDWRT_ZONE")
+	reclaimerInt   = os.Getenv("RECLAIMER_INTERVAL")
 )
+
+// defaultReclaimerInterval is used when RECLAIMER_INTERVAL is empty.
+// Set RECLAIMER_INTERVAL=0 (or a negative duration) to disable.
+const defaultReclaimerInterval = 60 * time.Second
 
 func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest) (*ipservice.IpResponse, error) {
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
@@ -154,6 +160,17 @@ func main() {
 
 	// START HTTP/HTMX SERVER IN BACKGROUND
 	go internal.StartWebServer(httpPort, loadConfigFrom, configLocation, configName, pdns, ddwrt)
+
+	// START LEASE RECLAIMER IN BACKGROUND
+	interval := defaultReclaimerInterval
+	if reclaimerInt != "" {
+		if d, err := time.ParseDuration(reclaimerInt); err == nil {
+			interval = d
+		} else {
+			logger.Warn("INVALID RECLAIMER_INTERVAL, USING DEFAULT", logger.Args("value", reclaimerInt, "default", interval.String()))
+		}
+	}
+	go internal.StartReclaimer(context.Background(), interval, loadConfigFrom, configLocation, configName, pdns, ddwrt)
 
 	lis, err := net.Listen("tcp", serverPort)
 	if err != nil {

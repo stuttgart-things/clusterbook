@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // NetworkPoolInfo holds summary info for a network pool
@@ -26,11 +27,12 @@ type NetworkPoolInfo struct {
 
 // IPEntry holds a single IP entry for display
 type IPEntry struct {
-	IP      string `json:"ip"`
-	Digit   string `json:"digit"`
-	Status  string `json:"status"`
-	Cluster string `json:"cluster"`
-	FQDN    string `json:"fqdn,omitempty"`
+	IP             string `json:"ip"`
+	Digit          string `json:"digit"`
+	Status         string `json:"status"`
+	Cluster        string `json:"cluster"`
+	FQDN           string `json:"fqdn,omitempty"`
+	LeaseExpiresAt int64  `json:"lease_expires_at,omitempty"`
 }
 
 // dnsZone returns the configured DNS zone (without trailing dot) from PDNS or DDWRT.
@@ -80,6 +82,9 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 	})
 	mux.HandleFunc("POST /api/v1/networks/{key}/release", func(w http.ResponseWriter, r *http.Request) {
 		handleAPIRelease(w, r, loadFrom, configLoc, configNm, pdns, ddwrt)
+	})
+	mux.HandleFunc("POST /api/v1/networks/{key}/ips/{ip}/renew", func(w http.ResponseWriter, r *http.Request) {
+		handleAPIRenewLease(w, r, loadFrom, configLoc, configNm)
 	})
 
 	// REST API CRUD routes
@@ -177,10 +182,11 @@ func getIPEntries(ips IPs, networkKey string) []IPEntry {
 	var entries []IPEntry
 	for digit, info := range ips {
 		entries = append(entries, IPEntry{
-			IP:      networkKey + "." + digit,
-			Digit:   digit,
-			Status:  info.Status,
-			Cluster: info.Cluster,
+			IP:             networkKey + "." + digit,
+			Digit:          digit,
+			Status:         info.Status,
+			Cluster:        info.Cluster,
+			LeaseExpiresAt: info.LeaseExpiresAt,
 		})
 	}
 	sort.Slice(entries, func(i, j int) bool {
@@ -199,7 +205,6 @@ type dashboardData struct {
 	Commit    string
 	StartTime string
 }
-
 
 func handleDashboard(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
 	ipList := LoadProfile(loadFrom, configLoc, configNm)
@@ -386,10 +391,11 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	networkKey := r.PathValue("key")
 
 	var req struct {
-		IP        string `json:"ip"`
-		Cluster   string `json:"cluster"`
-		Status    string `json:"status"`
-		CreateDNS bool   `json:"create_dns"`
+		IP                   string `json:"ip"`
+		Cluster              string `json:"cluster"`
+		Status               string `json:"status"`
+		CreateDNS            bool   `json:"create_dns"`
+		LeaseDurationSeconds int64  `json:"lease_duration_seconds"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -425,6 +431,11 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		entry.Status = req.Status + ":DNS"
 	}
 	entry.Cluster = req.Cluster
+	if req.LeaseDurationSeconds > 0 {
+		entry.LeaseExpiresAt = time.Now().Unix() + req.LeaseDurationSeconds
+	} else {
+		entry.LeaseExpiresAt = 0
+	}
 	ipList[networkKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
@@ -448,9 +459,10 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	networkKey := r.PathValue("key")
 
 	var req struct {
-		Cluster   string `json:"cluster"`
-		Status    string `json:"status"`
-		CreateDNS bool   `json:"create_dns"`
+		Cluster              string `json:"cluster"`
+		Status               string `json:"status"`
+		CreateDNS            bool   `json:"create_dns"`
+		LeaseDurationSeconds int64  `json:"lease_duration_seconds"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -498,6 +510,11 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		entry.Status = req.Status + ":DNS"
 	}
 	entry.Cluster = req.Cluster
+	if req.LeaseDurationSeconds > 0 {
+		entry.LeaseExpiresAt = time.Now().Unix() + req.LeaseDurationSeconds
+	} else {
+		entry.LeaseExpiresAt = 0
+	}
 	ipList[networkKey][foundDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
@@ -548,6 +565,7 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
 	entry.Status = ""
 	entry.Cluster = ""
+	entry.LeaseExpiresAt = 0
 	ipList[networkKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
@@ -563,6 +581,60 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"message": fmt.Sprintf("IP %s released", req.IP),
+	})
+}
+
+func handleAPIRenewLease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
+	networkKey := r.PathValue("key")
+	ip := r.PathValue("ip")
+
+	var req struct {
+		LeaseDurationSeconds int64 `json:"lease_duration_seconds"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.LeaseDurationSeconds <= 0 {
+		http.Error(w, `{"error":"lease_duration_seconds must be > 0"}`, http.StatusBadRequest)
+		return
+	}
+
+	ipList := LoadProfile(loadFrom, configLoc, configNm)
+
+	if _, ok := ipList[networkKey]; !ok {
+		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
+		return
+	}
+
+	ipDigit, err := GetLastIPDigit(ip)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	entry, ok := ipList[networkKey][ipDigit]
+	if !ok {
+		http.Error(w, `{"error":"ip not found"}`, http.StatusNotFound)
+		return
+	}
+	if entry.Status == "" {
+		http.Error(w, `{"error":"ip is not assigned"}`, http.StatusConflict)
+		return
+	}
+
+	entry.LeaseExpiresAt = time.Now().Unix() + req.LeaseDurationSeconds
+	ipList[networkKey][ipDigit] = entry
+
+	saveConfig(ipList, loadFrom, configLoc, configNm)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"status":           "ok",
+		"ip":               ip,
+		"lease_expires_at": entry.LeaseExpiresAt,
 	})
 }
 

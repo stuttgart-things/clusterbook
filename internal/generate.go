@@ -15,8 +15,9 @@ import (
 )
 
 type IPInfo struct {
-	Status  string `yaml:"status"`
-	Cluster string `yaml:"cluster"`
+	Status         string `yaml:"status"`
+	Cluster        string `yaml:"cluster"`
+	LeaseExpiresAt int64  `yaml:"lease_expires_at,omitempty"`
 }
 
 type IPs map[string]IPInfo

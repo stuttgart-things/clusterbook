@@ -6,8 +6,11 @@ package internal
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
+
+const crLeasePrefix = "exp="
 
 func TruncateIP(ip string) (string, error) {
 	segments := strings.Split(ip, ".")
@@ -39,13 +42,18 @@ func ConvertToCRFormat(info map[string]IPs) map[string][]string {
 	// Iterate over the info map to populate the networks map
 	for ip, ipDetails := range info {
 		for ipDigit, details := range ipDetails {
+			var entry string
 			if details.Status != "" && details.Cluster != "" {
 				// Format: "ipDigit:status:cluster"
-				networks[ip] = append(networks[ip], fmt.Sprintf("%s:%s:%s", ipDigit, details.Status, details.Cluster))
+				entry = fmt.Sprintf("%s:%s:%s", ipDigit, details.Status, details.Cluster)
 			} else {
 				// Just add the ipDigit if status or cluster is empty
-				networks[ip] = append(networks[ip], ipDigit)
+				entry = ipDigit
 			}
+			if details.LeaseExpiresAt != 0 {
+				entry = fmt.Sprintf("%s:%s%d", entry, crLeasePrefix, details.LeaseExpiresAt)
+			}
+			networks[ip] = append(networks[ip], entry)
 		}
 	}
 
@@ -60,9 +68,18 @@ func ConvertFromCRFormat(data map[string][]string) map[string]IPs {
 
 		for _, entry := range entries {
 			parts := strings.Split(entry, ":")
-			ipDigit := parts[0]
 
 			info := IPInfo{}
+			if len(parts) > 0 && strings.HasPrefix(parts[len(parts)-1], crLeasePrefix) {
+				raw := strings.TrimPrefix(parts[len(parts)-1], crLeasePrefix)
+				if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+					info.LeaseExpiresAt = v
+				}
+				parts = parts[:len(parts)-1]
+			}
+
+			ipDigit := parts[0]
+
 			if len(parts) > 1 {
 				info.Status = parts[1]
 				if len(parts) > 2 {
