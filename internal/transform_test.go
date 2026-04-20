@@ -117,6 +117,26 @@ func TestTruncateIP(t *testing.T) {
 	}
 }
 
+// TestConvertCRFormatRoundTripWithLease ensures the lease expiry survives round-trip
+// through the CR encoded-string format for every status-shape permutation.
+func TestConvertCRFormatRoundTripWithLease(t *testing.T) {
+	input := map[string]IPs{
+		"10.31.103": {
+			"3": {Status: "ASSIGNED", Cluster: "sandiego", LeaseExpiresAt: 1712345678},
+			"4": {Status: "ASSIGNED:DNS", Cluster: "miami", LeaseExpiresAt: 1799999999},
+			"5": {Status: "", Cluster: "", LeaseExpiresAt: 0},
+			"6": {Status: "ASSIGNED", Cluster: "no-lease"},
+		},
+	}
+
+	cr := ConvertToCRFormat(input)
+	out := ConvertFromCRFormat(cr)
+
+	if !reflect.DeepEqual(out, input) {
+		t.Errorf("round-trip mismatch:\nwant %+v\n got %+v", input, out)
+	}
+}
+
 // TestConvertFromCRFormat tests the ConvertFromCRFormat function
 func TestConvertFromCRFormat(t *testing.T) {
 	// Input data in CR format, including DNS suffix case
