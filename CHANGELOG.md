@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/stuttgart-things/clusterbook/compare/v1.24.2...v1.25.0) (2026-04-20)
+
+
+### Features
+
+* add IP lease/expiry model with auto-reclaim ([#149](https://github.com/stuttgart-things/clusterbook/issues/149)) ([bddd5fb](https://github.com/stuttgart-things/clusterbook/commit/bddd5fb54607eed7b62e277f5089216eea920665))
+
 ## [1.24.2](https://github.com/stuttgart-things/clusterbook/compare/v1.24.1...v1.24.2) (2026-04-20)
 
 
