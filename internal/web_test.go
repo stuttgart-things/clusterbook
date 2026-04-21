@@ -288,6 +288,150 @@ func TestHandleAPIAssignWithLease(t *testing.T) {
 	}
 }
 
+// Regression tests for #150 — reserve with createDNS=true:
+// - camelCase createDNS is accepted (operator dialect, not just create_dns)
+// - response contains an "ips" array so clients expecting that shape can parse it
+// - follow-up edit doesn't double-append ":DNS" to the status
+// - list-ips carries an fqdn field on the new entry end-to-end
+func TestHandleAPIReserveAcceptsCamelCaseCreateDNS(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	body := `{"cluster":"smoke-alloc","count":1,"createDNS":true}`
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/reserve", strings.NewReader(body))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	handleAPIReserve(w, req, "disk", dir, name, nil, nil)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		IP      string   `json:"ip"`
+		IPs     []string `json:"ips"`
+		Status  string   `json:"status"`
+		Cluster string   `json:"cluster"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	if resp.Cluster != "smoke-alloc" {
+		t.Errorf("cluster in response: got %q, want %q", resp.Cluster, "smoke-alloc")
+	}
+	if resp.Status != "ASSIGNED:DNS" {
+		t.Errorf("status in response: got %q, want %q", resp.Status, "ASSIGNED:DNS")
+	}
+	if resp.IP == "" {
+		t.Errorf("ip field missing")
+	}
+	if len(resp.IPs) != 1 || resp.IPs[0] != resp.IP {
+		t.Errorf("ips field: got %v, want [%q]", resp.IPs, resp.IP)
+	}
+
+	// Persisted entry should match — cluster kept intact, :DNS suffix set.
+	ipList := LoadProfile("disk", dir, name)
+	digit := strings.TrimPrefix(resp.IP, "10.31.103.")
+	entry := ipList["10.31.103"][digit]
+	if entry.Cluster != "smoke-alloc" {
+		t.Errorf("persisted cluster: got %q, want %q", entry.Cluster, "smoke-alloc")
+	}
+	if entry.Status != "ASSIGNED:DNS" {
+		t.Errorf("persisted status: got %q, want %q", entry.Status, "ASSIGNED:DNS")
+	}
+}
+
+func TestHandleAPIAssignAcceptsCamelCaseCreateDNS(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	body := `{"ip":"10.31.103.7","cluster":"smoke-assign","status":"ASSIGNED","createDNS":true}`
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/assign", strings.NewReader(body))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	handleAPIAssign(w, req, "disk", dir, name, nil, nil)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	entry := LoadProfile("disk", dir, name)["10.31.103"]["7"]
+	if entry.Cluster != "smoke-assign" {
+		t.Errorf("cluster: got %q, want %q", entry.Cluster, "smoke-assign")
+	}
+	if entry.Status != "ASSIGNED:DNS" {
+		t.Errorf("status: got %q, want %q", entry.Status, "ASSIGNED:DNS")
+	}
+}
+
+func TestHandleAPIEditIPDoesNotDoubleSuffixDNS(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	// Mirrors the operator's drift-reconcile body: pre-suffixed status + createDNS=true.
+	body := `{"cluster":"mycluster","status":"ASSIGNED:DNS","createDNS":true}`
+	req := httptest.NewRequest("PUT", "/api/v1/networks/10.31.103/ips/6", strings.NewReader(body))
+	req.SetPathValue("key", "10.31.103")
+	req.SetPathValue("ip", "6")
+	w := httptest.NewRecorder()
+
+	handleAPIEditIP(w, req, "disk", dir, name, nil, nil)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	entry := LoadProfile("disk", dir, name)["10.31.103"]["6"]
+	if entry.Status != "ASSIGNED:DNS" {
+		t.Errorf("status: got %q, want %q (no double :DNS)", entry.Status, "ASSIGNED:DNS")
+	}
+}
+
+func TestHandleAPIReserveThenListIPsIncludesFQDN(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+	// DDWRT with a fake executor gives us a zone without touching SSH or HTTP.
+	ddwrt := newDDWRTClientWithExecutor("sthings.lab", newFakeExecutor())
+
+	reserveBody := `{"cluster":"e2e-alloc","createDNS":true}`
+	reserveReq := httptest.NewRequest("POST", "/api/v1/networks/10.31.104/reserve", strings.NewReader(reserveBody))
+	reserveReq.SetPathValue("key", "10.31.104")
+	reserveW := httptest.NewRecorder()
+	handleAPIReserve(reserveW, reserveReq, "disk", dir, name, nil, ddwrt)
+	if reserveW.Code != http.StatusOK {
+		t.Fatalf("reserve: expected 200, got %d: %s", reserveW.Code, reserveW.Body.String())
+	}
+
+	listReq := httptest.NewRequest("GET", "/api/v1/networks/10.31.104/ips", nil)
+	listReq.SetPathValue("key", "10.31.104")
+	listW := httptest.NewRecorder()
+	handleAPINetworkIPs(listW, listReq, "disk", dir, name, nil, ddwrt)
+	if listW.Code != http.StatusOK {
+		t.Fatalf("list: expected 200, got %d: %s", listW.Code, listW.Body.String())
+	}
+
+	var entries []IPEntry
+	if err := json.NewDecoder(listW.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	var found *IPEntry
+	for i, e := range entries {
+		if e.Cluster == "e2e-alloc" {
+			found = &entries[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("reserved entry not in listing; entries=%+v", entries)
+	}
+	if found.Status != "ASSIGNED:DNS" {
+		t.Errorf("listing status: got %q, want ASSIGNED:DNS", found.Status)
+	}
+	if found.FQDN != "*.e2e-alloc.sthings.lab" {
+		t.Errorf("listing fqdn: got %q, want *.e2e-alloc.sthings.lab", found.FQDN)
+	}
+}
+
 func TestHandleAPIRenewLease(t *testing.T) {
 	dir, name := setupTestConfig(t, testConfigYAML)
 

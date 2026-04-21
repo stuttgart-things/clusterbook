@@ -395,12 +395,17 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		Cluster              string `json:"cluster"`
 		Status               string `json:"status"`
 		CreateDNS            bool   `json:"create_dns"`
+		CreateDNSAlt         bool   `json:"createDNS"`
 		LeaseDurationSeconds int64  `json:"lease_duration_seconds"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
 		return
+	}
+
+	if req.CreateDNSAlt {
+		req.CreateDNS = true
 	}
 
 	if req.IP == "" || req.Cluster == "" {
@@ -462,12 +467,17 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		Cluster              string `json:"cluster"`
 		Status               string `json:"status"`
 		CreateDNS            bool   `json:"create_dns"`
+		CreateDNSAlt         bool   `json:"createDNS"`
 		LeaseDurationSeconds int64  `json:"lease_duration_seconds"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
 		return
+	}
+
+	if req.CreateDNSAlt {
+		req.CreateDNS = true
 	}
 
 	if req.Cluster == "" {
@@ -527,10 +537,11 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]any{
 		"ip":      fullIP,
+		"ips":     []string{fullIP},
 		"digit":   foundDigit,
-		"status":  req.Status,
+		"status":  entry.Status,
 		"cluster": req.Cluster,
 	})
 }
@@ -923,9 +934,10 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	prevCluster := entry.Cluster
 	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
 
-	entry.Status = req.Status
+	baseStatus := strings.TrimSuffix(req.Status, ":DNS")
+	entry.Status = baseStatus
 	if req.CreateDNS {
-		entry.Status = req.Status + ":DNS"
+		entry.Status = baseStatus + ":DNS"
 	}
 	entry.Cluster = req.Cluster
 	ipList[networkKey][ipDigit] = entry
