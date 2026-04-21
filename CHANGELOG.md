@@ -1,3 +1,10 @@
+## [1.25.1](https://github.com/stuttgart-things/clusterbook/compare/v1.25.0...v1.25.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* accept createDNS on reserve/assign and prevent double :DNS suffix ([#151](https://github.com/stuttgart-things/clusterbook/issues/151)) ([3bcad6d](https://github.com/stuttgart-things/clusterbook/commit/3bcad6dd4fc86c44abc66f3463ca42f14fe4f280)), closes [#141](https://github.com/stuttgart-things/clusterbook/issues/141) [#150](https://github.com/stuttgart-things/clusterbook/issues/150)
+
 # [1.25.0](https://github.com/stuttgart-things/clusterbook/compare/v1.24.2...v1.25.0) (2026-04-20)
 
 
