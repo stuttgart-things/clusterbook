@@ -1,3 +1,11 @@
+## [1.25.2](https://github.com/stuttgart-things/clusterbook/compare/v1.25.1...v1.25.2) (2026-05-06)
+
+
+### Bug Fixes
+
+* **deps:** update module google.golang.org/grpc to v1.81.0 ([#154](https://github.com/stuttgart-things/clusterbook/issues/154)) ([8efa2f1](https://github.com/stuttgart-things/clusterbook/commit/8efa2f1b2b574f8dcbed2e7a2d6a5f4e3000e893))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.24.0 ([#153](https://github.com/stuttgart-things/clusterbook/issues/153)) ([149c5b4](https://github.com/stuttgart-things/clusterbook/commit/149c5b4b4d6e4820a2f7726ad3d073cd10e43a4f))
+
 ## [1.25.1](https://github.com/stuttgart-things/clusterbook/compare/v1.25.0...v1.25.1) (2026-04-21)
 
 
