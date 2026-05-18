@@ -1,3 +1,10 @@
+## [1.25.5](https://github.com/stuttgart-things/clusterbook/compare/v1.25.4...v1.25.5) (2026-05-18)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes monorepo to v0.36.1 ([#152](https://github.com/stuttgart-things/clusterbook/issues/152)) ([2d13ca5](https://github.com/stuttgart-things/clusterbook/commit/2d13ca503a770423222aaead18e0fab0c692320b))
+
 ## [1.25.4](https://github.com/stuttgart-things/clusterbook/compare/v1.25.3...v1.25.4) (2026-05-18)
 
 
