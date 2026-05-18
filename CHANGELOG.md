@@ -1,3 +1,10 @@
+## [1.25.4](https://github.com/stuttgart-things/clusterbook/compare/v1.25.3...v1.25.4) (2026-05-18)
+
+
+### Bug Fixes
+
+* **deps:** update module golang.org/x/crypto to v0.51.0 ([#157](https://github.com/stuttgart-things/clusterbook/issues/157)) ([21ce208](https://github.com/stuttgart-things/clusterbook/commit/21ce2081245675601bdaa5932a723bbed4151f4b))
+
 ## [1.25.3](https://github.com/stuttgart-things/clusterbook/compare/v1.25.2...v1.25.3) (2026-05-18)
 
 
