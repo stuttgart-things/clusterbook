@@ -1,3 +1,12 @@
+## [1.25.3](https://github.com/stuttgart-things/clusterbook/compare/v1.25.2...v1.25.3) (2026-05-18)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/crossplane/crossplane-runtime to v2 ([#156](https://github.com/stuttgart-things/clusterbook/issues/156)) ([3c2ed88](https://github.com/stuttgart-things/clusterbook/commit/3c2ed88b8e771f1480b982a217418b41a02e2f92))
+* **deps:** update module google.golang.org/grpc to v1.81.1 ([#159](https://github.com/stuttgart-things/clusterbook/issues/159)) ([afbf815](https://github.com/stuttgart-things/clusterbook/commit/afbf81583e45d1237ca03fe9521118c25de8313a))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.24.1 ([#158](https://github.com/stuttgart-things/clusterbook/issues/158)) ([902949b](https://github.com/stuttgart-things/clusterbook/commit/902949b1c57eda37f9213ab0d991189ce217eda5))
+
 ## [1.25.2](https://github.com/stuttgart-things/clusterbook/compare/v1.25.1...v1.25.2) (2026-05-06)
 
 
