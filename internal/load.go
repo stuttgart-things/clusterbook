@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pterm/pterm"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,6 +57,16 @@ func LoadProfile(source, configLocation, configName string) (map[string]IPs, err
 	case "cr":
 		retrievedConfig, err := GetNetworkConfig(configName, configLocation)
 		if err != nil {
+			// A missing CR is not an error: the app self-bootstraps. Start with
+			// an empty config so the server stays usable; the first network/IP
+			// write creates the CR via CreateOrUpdateNetworkConfig.
+			if apierrors.IsNotFound(err) {
+				pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace).Info(
+					"NetworkConfig not found, starting with empty config (will be created on first write)",
+					pterm.DefaultLogger.Args("name", configName, "namespace", configLocation),
+				)
+				return map[string]IPs{}, nil
+			}
 			return nil, fmt.Errorf("load profile: get networkconfig %q in namespace %q: %w", configName, configLocation, err)
 		}
 		return ConvertFromCRFormat(retrievedConfig.Spec.Networks), nil
