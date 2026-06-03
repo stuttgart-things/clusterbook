@@ -67,6 +67,20 @@ func TestRemoveDNSEntry_NotPresent(t *testing.T) {
 	}
 }
 
+func TestLookupDNSEntry_Found(t *testing.T) {
+	existing := "address=/myapp.sthings.lab/10.31.103.6\naddress=/other.sthings.lab/10.31.103.7"
+	if ip := lookupDNSEntry(existing, "myapp.sthings.lab"); ip != "10.31.103.6" {
+		t.Errorf("expected 10.31.103.6, got %q", ip)
+	}
+}
+
+func TestLookupDNSEntry_NotFound(t *testing.T) {
+	existing := "address=/other.sthings.lab/10.31.103.7"
+	if ip := lookupDNSEntry(existing, "myapp.sthings.lab"); ip != "" {
+		t.Errorf("expected empty result, got %q", ip)
+	}
+}
+
 // ── Unit tests: mock executor (no network) ────────────────────────────────────
 
 // fakeExecutor implements SSHExecutor in memory — no SSH, no network.
@@ -169,6 +183,49 @@ func TestDDWRTClient_MultipleRecords_Mock(t *testing.T) {
 	}
 }
 
+func TestDDWRTClient_TestDNS_Match_Mock(t *testing.T) {
+	exec := newFakeExecutor()
+	client := newDDWRTClientWithExecutor("sthings.lab", exec)
+	client.CreateRecord("myapp", "10.31.103.6")
+
+	fqdn, resolved, match, err := client.TestDNS("myapp", "10.31.103.6")
+	if err != nil {
+		t.Fatalf("TestDNS failed: %v", err)
+	}
+	if fqdn != "myapp.sthings.lab" {
+		t.Errorf("unexpected fqdn: %q", fqdn)
+	}
+	if resolved != "10.31.103.6" || !match {
+		t.Errorf("expected match on 10.31.103.6, got resolved=%q match=%v", resolved, match)
+	}
+}
+
+func TestDDWRTClient_TestDNS_Mismatch_Mock(t *testing.T) {
+	exec := newFakeExecutor()
+	client := newDDWRTClientWithExecutor("sthings.lab", exec)
+	client.CreateRecord("myapp", "10.31.103.6")
+
+	_, resolved, match, err := client.TestDNS("myapp", "10.31.103.99")
+	if err != nil {
+		t.Fatalf("TestDNS failed: %v", err)
+	}
+	if match {
+		t.Error("expected no match for differing IP")
+	}
+	if resolved != "10.31.103.6" {
+		t.Errorf("expected resolved 10.31.103.6, got %q", resolved)
+	}
+}
+
+func TestDDWRTClient_TestDNS_Missing_Mock(t *testing.T) {
+	exec := newFakeExecutor()
+	client := newDDWRTClientWithExecutor("sthings.lab", exec)
+
+	if _, _, _, err := client.TestDNS("myapp", "10.31.103.6"); err == nil {
+		t.Error("expected error when no entry exists")
+	}
+}
+
 // ── Integration tests: fake SSH server (real SSH stack, fake nvram) ───────────
 
 func TestDDWRTClient_CreateRecord_FakeSSH(t *testing.T) {
@@ -254,6 +311,32 @@ func TestDDWRTClient_Idempotent_FakeSSH(t *testing.T) {
 	}
 	if !strings.Contains(opts, "10.31.103.6") {
 		t.Errorf("expected updated IP, got: %q", opts)
+	}
+}
+
+func TestDDWRTClient_TestDNS_FakeSSH(t *testing.T) {
+	srv, err := NewFakeDDWRTServer("root", "testpass")
+	if err != nil {
+		t.Fatalf("start fake server: %v", err)
+	}
+	defer srv.Close()
+
+	srv.NvramSet("dnsmasq_options", "address=/myapp.sthings.lab/10.31.103.6")
+
+	client := &DDWRTClient{
+		Host:     srv.Addr,
+		User:     "root",
+		Password: "testpass",
+		Zone:     "sthings.lab",
+		logger:   pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace),
+	}
+
+	fqdn, resolved, match, err := client.TestDNS("myapp", "10.31.103.6")
+	if err != nil {
+		t.Fatalf("TestDNS failed: %v", err)
+	}
+	if fqdn != "myapp.sthings.lab" || resolved != "10.31.103.6" || !match {
+		t.Errorf("unexpected result: fqdn=%q resolved=%q match=%v", fqdn, resolved, match)
 	}
 }
 

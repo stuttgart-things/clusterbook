@@ -159,7 +159,7 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleHTMXDeleteNetwork(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("POST /htmx/test-dns", func(w http.ResponseWriter, r *http.Request) {
-		handleHTMXTestDNS(w, r, pdns)
+		handleHTMXTestDNS(w, r, pdns, ddwrt)
 	})
 
 	log.Printf("HTTP/HTMX SERVER LISTENING AT :%s", httpPort)
@@ -1355,7 +1355,7 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	}{networkKey, entries})
 }
 
-func handleHTMXTestDNS(w http.ResponseWriter, r *http.Request, pdns *PDNSClient) {
+func handleHTMXTestDNS(w http.ResponseWriter, r *http.Request, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1369,7 +1369,23 @@ func handleHTMXTestDNS(w http.ResponseWriter, r *http.Request, pdns *PDNSClient)
 		return
 	}
 
-	fqdn, resolved, match, err := pdns.TestDNS(cluster, expectedIP)
+	// Test against whichever DNS provider is enabled. PDNS takes precedence;
+	// fall back to DD-WRT so DD-WRT-only deployments can verify records too.
+	var (
+		fqdn, resolved string
+		match          bool
+		err            error
+	)
+	switch {
+	case pdns != nil:
+		fqdn, resolved, match, err = pdns.TestDNS(cluster, expectedIP)
+	case ddwrt != nil:
+		fqdn, resolved, match, err = ddwrt.TestDNS(cluster, expectedIP)
+	default:
+		fmt.Fprintf(w, `<span style="color:#f97316;font-size:0.75rem;">no DNS provider enabled</span>`)
+		return
+	}
+
 	if err != nil {
 		fmt.Fprintf(w, `<span style="color:#ef4444;font-size:0.75rem;" title="%s">DNS FAIL</span>`, err.Error())
 		return
