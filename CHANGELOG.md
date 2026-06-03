@@ -1,3 +1,10 @@
+## [1.25.7](https://github.com/stuttgart-things/clusterbook/compare/v1.25.6...v1.25.7) (2026-06-03)
+
+
+### Bug Fixes
+
+* keep clusterbook running when NetworkConfig CR is missing ([#166](https://github.com/stuttgart-things/clusterbook/issues/166)) ([3e270fa](https://github.com/stuttgart-things/clusterbook/commit/3e270fa8ba04ed4da396e11efe364b50ecd893f9))
+
 ## [1.25.6](https://github.com/stuttgart-things/clusterbook/compare/v1.25.5...v1.25.6) (2026-05-22)
 
 
