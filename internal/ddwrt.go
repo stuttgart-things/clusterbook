@@ -58,10 +58,17 @@ func newDDWRTClientWithExecutor(zone string, exec SSHExecutor) *DDWRTClient {
 }
 
 // CreateRecord adds/updates a dnsmasq address entry on DD-WRT via SSH.
-func (d *DDWRTClient) CreateRecord(hostname, ip string) error {
+// Errors are logged here (not just returned) so failures are never silent,
+// mirroring how PDNSClient self-logs inside patchZone.
+func (d *DDWRTClient) CreateRecord(hostname, ip string) (err error) {
 	fqdn := fmt.Sprintf("%s.%s", hostname, d.Zone)
 	newEntry := fmt.Sprintf("address=/%s/%s", fqdn, ip)
 	d.logger.Info("DDWRT CREATE DNS RECORD", d.logger.Args("fqdn", fqdn, "ip", ip))
+	defer func() {
+		if err != nil {
+			d.logger.Error("DDWRT CREATE DNS RECORD FAILED", d.logger.Args("fqdn", fqdn, "ip", ip, "err", err.Error()))
+		}
+	}()
 
 	exec, cleanup, err := d.getExecutor()
 	if err != nil {
@@ -86,9 +93,15 @@ func (d *DDWRTClient) CreateRecord(hostname, ip string) error {
 }
 
 // DeleteRecord removes a dnsmasq address entry from DD-WRT via SSH.
-func (d *DDWRTClient) DeleteRecord(hostname string) error {
+// Errors are logged here (not just returned) so failures are never silent.
+func (d *DDWRTClient) DeleteRecord(hostname string) (err error) {
 	fqdn := fmt.Sprintf("%s.%s", hostname, d.Zone)
 	d.logger.Info("DDWRT DELETE DNS RECORD", d.logger.Args("fqdn", fqdn))
+	defer func() {
+		if err != nil {
+			d.logger.Error("DDWRT DELETE DNS RECORD FAILED", d.logger.Args("fqdn", fqdn, "err", err.Error()))
+		}
+	}()
 
 	exec, cleanup, err := d.getExecutor()
 	if err != nil {
@@ -110,6 +123,37 @@ func (d *DDWRTClient) DeleteRecord(hostname string) error {
 
 	d.logger.Info("DDWRT DNS RECORD DELETED", d.logger.Args("fqdn", fqdn))
 	return nil
+}
+
+// TestDNS verifies the dnsmasq address entry for the cluster's FQDN exists on
+// DD-WRT and resolves to the expected IP. It reads dnsmasq_options over SSH and
+// inspects the managed `address=/{fqdn}/{ip}` record directly — an in-cluster
+// net.LookupHost would hit the pod resolver (CoreDNS), not the DD-WRT router.
+// Returns (fqdn, resolvedIP, match, error), mirroring PDNSClient.TestDNS.
+func (d *DDWRTClient) TestDNS(cluster, expectedIP string) (string, string, bool, error) {
+	if d == nil {
+		return "", "", false, fmt.Errorf("DDWRT not enabled")
+	}
+
+	fqdn := fmt.Sprintf("%s.%s", cluster, d.Zone)
+
+	exec, cleanup, err := d.getExecutor()
+	if err != nil {
+		return fqdn, "", false, fmt.Errorf("ddwrt ssh connect: %w", err)
+	}
+	defer cleanup()
+
+	existing, err := exec.Run("nvram get dnsmasq_options")
+	if err != nil {
+		return fqdn, "", false, fmt.Errorf("ddwrt read dnsmasq_options: %w", err)
+	}
+
+	resolved := lookupDNSEntry(existing, fqdn)
+	if resolved == "" {
+		return fqdn, "", false, fmt.Errorf("no dnsmasq entry for %s", fqdn)
+	}
+
+	return fqdn, resolved, resolved == expectedIP, nil
 }
 
 // getExecutor returns injected executor (tests) or a fresh real SSH executor.
@@ -170,6 +214,19 @@ func mergeDNSEntry(existing, newEntry, fqdn string) string {
 		lines = append(lines, line)
 	}
 	return strings.Join(append(lines, newEntry), "\n")
+}
+
+// lookupDNSEntry returns the IP of the `address=/{fqdn}/{ip}` entry in
+// dnsmasq_options content, or "" if no matching entry exists.
+func lookupDNSEntry(existing, fqdn string) string {
+	marker := "/" + fqdn + "/"
+	for _, line := range strings.Split(existing, "\n") {
+		line = strings.TrimSpace(line)
+		if idx := strings.Index(line, marker); idx >= 0 {
+			return line[idx+len(marker):]
+		}
+	}
+	return ""
 }
 
 func removeDNSEntry(existing, fqdn string) string {

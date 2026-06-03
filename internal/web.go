@@ -159,7 +159,7 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleHTMXDeleteNetwork(w, r, loadFrom, configLoc, configNm)
 	})
 	mux.HandleFunc("POST /htmx/test-dns", func(w http.ResponseWriter, r *http.Request) {
-		handleHTMXTestDNS(w, r, pdns)
+		handleHTMXTestDNS(w, r, pdns, ddwrt)
 	})
 
 	log.Printf("HTTP/HTMX SERVER LISTENING AT :%s", httpPort)
@@ -1006,14 +1006,16 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
-	// Handle DNS changes
+	// Handle DNS changes. Remove the old record when DNS is turned off or the
+	// cluster changed. When DNS is on, always (re)create — both providers are
+	// idempotent, so re-saving reconciles a record that drifted from the router.
 	if hadDNS && (!req.CreateDNS || prevCluster != req.Cluster) {
 		pdns.DeleteRecord(prevCluster)
 		if ddwrt != nil {
 			ddwrt.DeleteRecord(prevCluster)
 		}
 	}
-	if req.CreateDNS && (!hadDNS || prevCluster != req.Cluster) {
+	if req.CreateDNS {
 		pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
 		if ddwrt != nil {
 			ddwrt.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
@@ -1331,14 +1333,16 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
-	// Handle DNS changes
+	// Handle DNS changes. Remove the old record when DNS is turned off or the
+	// cluster changed. When DNS is on, always (re)create — both providers are
+	// idempotent, so re-saving reconciles a record that drifted from the router.
 	if hadDNS && (!createDNS || prevCluster != cluster) {
 		pdns.DeleteRecord(prevCluster)
 		if ddwrt != nil {
 			ddwrt.DeleteRecord(prevCluster)
 		}
 	}
-	if createDNS && (!hadDNS || prevCluster != cluster) {
+	if createDNS {
 		pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
 		if ddwrt != nil {
 			ddwrt.CreateRecord(cluster, ipKey+"."+ipDigit)
@@ -1355,7 +1359,7 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	}{networkKey, entries})
 }
 
-func handleHTMXTestDNS(w http.ResponseWriter, r *http.Request, pdns *PDNSClient) {
+func handleHTMXTestDNS(w http.ResponseWriter, r *http.Request, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1369,7 +1373,23 @@ func handleHTMXTestDNS(w http.ResponseWriter, r *http.Request, pdns *PDNSClient)
 		return
 	}
 
-	fqdn, resolved, match, err := pdns.TestDNS(cluster, expectedIP)
+	// Test against whichever DNS provider is enabled. PDNS takes precedence;
+	// fall back to DD-WRT so DD-WRT-only deployments can verify records too.
+	var (
+		fqdn, resolved string
+		match          bool
+		err            error
+	)
+	switch {
+	case pdns != nil:
+		fqdn, resolved, match, err = pdns.TestDNS(cluster, expectedIP)
+	case ddwrt != nil:
+		fqdn, resolved, match, err = ddwrt.TestDNS(cluster, expectedIP)
+	default:
+		fmt.Fprintf(w, `<span style="color:#f97316;font-size:0.75rem;">no DNS provider enabled</span>`)
+		return
+	}
+
 	if err != nil {
 		fmt.Fprintf(w, `<span style="color:#ef4444;font-size:0.75rem;" title="%s">DNS FAIL</span>`, err.Error())
 		return
