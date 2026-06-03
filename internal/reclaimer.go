@@ -86,7 +86,11 @@ func StartReclaimer(ctx context.Context, interval time.Duration, loadFrom, confi
 			logger.Info("lease reclaimer stopped")
 			return
 		case <-ticker.C:
-			ipList := LoadProfile(loadFrom, configLoc, configNm)
+			ipList, err := LoadProfile(loadFrom, configLoc, configNm)
+			if err != nil {
+				logger.Warn("lease reclaimer: failed to load config, skipping cycle", logger.Args("err", err.Error()))
+				continue
+			}
 			reclaimed := ReclaimExpiredLeases(ipList, time.Now(), pdns, ddwrt)
 			if len(reclaimed) > 0 {
 				saveConfig(ipList, loadFrom, configLoc, configNm)

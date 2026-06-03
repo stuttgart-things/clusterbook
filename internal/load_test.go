@@ -77,6 +77,9 @@ func TestReadYAMLFileFromDisk(t *testing.T) {
 }
 
 func TestLoadProfile(t *testing.T) {
-	ipList := LoadProfile("disk", "../tests", "config.yaml")
+	ipList, err := LoadProfile("disk", "../tests", "config.yaml")
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
 	fmt.Println(ipList)
 }

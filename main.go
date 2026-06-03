@@ -66,7 +66,11 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 	}
 
 	// READ NetworkConfig FROM STATIC YAML FILE
-	ipList := internal.LoadProfile(loadConfigFrom, configLocation, configName)
+	ipList, err := internal.LoadProfile(loadConfigFrom, configLocation, configName)
+	if err != nil {
+		logger.Error("FAILED TO LOAD CONFIG", logger.Args("err", err.Error()))
+		return nil, err
+	}
 	fmt.Println("NETWORKS FROM STATC YAML FILE:", ipList)
 
 	availableAddresses, err := internal.GenerateIPs(ipList, int(req.CountIpAddresses), req.NetworkKey)
@@ -88,7 +92,11 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	logger.Info("CONFIG FILE PATH", logger.Args("", configLocation+"/"+configName))
 
 	// LOAD EXISTING YAML FILE
-	ipList := internal.LoadProfile(loadConfigFrom, configLocation, configName)
+	ipList, err := internal.LoadProfile(loadConfigFrom, configLocation, configName)
+	if err != nil {
+		logger.Error("FAILED TO LOAD CONFIG", logger.Args("err", err.Error()))
+		return nil, err
+	}
 
 	// GET IPS FROM REQUEST
 	ips := strings.Split(req.IpAddressRange, ";")
