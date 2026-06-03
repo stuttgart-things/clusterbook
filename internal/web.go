@@ -1006,14 +1006,16 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
-	// Handle DNS changes
+	// Handle DNS changes. Remove the old record when DNS is turned off or the
+	// cluster changed. When DNS is on, always (re)create — both providers are
+	// idempotent, so re-saving reconciles a record that drifted from the router.
 	if hadDNS && (!req.CreateDNS || prevCluster != req.Cluster) {
 		pdns.DeleteRecord(prevCluster)
 		if ddwrt != nil {
 			ddwrt.DeleteRecord(prevCluster)
 		}
 	}
-	if req.CreateDNS && (!hadDNS || prevCluster != req.Cluster) {
+	if req.CreateDNS {
 		pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
 		if ddwrt != nil {
 			ddwrt.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
@@ -1331,14 +1333,16 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
-	// Handle DNS changes
+	// Handle DNS changes. Remove the old record when DNS is turned off or the
+	// cluster changed. When DNS is on, always (re)create — both providers are
+	// idempotent, so re-saving reconciles a record that drifted from the router.
 	if hadDNS && (!createDNS || prevCluster != cluster) {
 		pdns.DeleteRecord(prevCluster)
 		if ddwrt != nil {
 			ddwrt.DeleteRecord(prevCluster)
 		}
 	}
-	if createDNS && (!hadDNS || prevCluster != cluster) {
+	if createDNS {
 		pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
 		if ddwrt != nil {
 			ddwrt.CreateRecord(cluster, ipKey+"."+ipDigit)
