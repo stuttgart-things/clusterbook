@@ -1,3 +1,10 @@
+## [1.25.8](https://github.com/stuttgart-things/clusterbook/compare/v1.25.7...v1.25.8) (2026-06-03)
+
+
+### Bug Fixes
+
+* support DD-WRT in DNS test and stop swallowing DD-WRT errors ([#167](https://github.com/stuttgart-things/clusterbook/issues/167)) ([dd08a16](https://github.com/stuttgart-things/clusterbook/commit/dd08a16dda8828a63a1cbcb839c00cd5e14a9809))
+
 ## [1.25.7](https://github.com/stuttgart-things/clusterbook/compare/v1.25.6...v1.25.7) (2026-06-03)
 
 
