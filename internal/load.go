@@ -6,9 +6,11 @@ package internal
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"os"
 
+	"github.com/pterm/pterm"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,33 +38,42 @@ func ReadYAMLFileFromDisk(filePath string) ([]byte, error) {
 	return os.ReadFile(filePath)
 }
 
-func LoadProfile(source, configLocation, configName string) (ipList map[string]IPs) {
-	// READ YAML FILE
-	var err error
-	var yamlData []byte
-
+// LoadProfile reads the NetworkConfig from the configured source (disk or CR).
+// It returns an error instead of terminating the process so that callers — web
+// handlers, gRPC handlers, and the background reclaimer — can fail a single
+// operation gracefully rather than crashing the whole server (and its readiness
+// probe) when the config is temporarily missing or unreachable.
+func LoadProfile(source, configLocation, configName string) (map[string]IPs, error) {
 	switch source {
 	// READ NetworkConfig FROM DISK
 	case "disk":
-		yamlData, err = ReadYAMLFileFromDisk(configLocation + "/" + configName)
+		yamlData, err := ReadYAMLFileFromDisk(configLocation + "/" + configName)
 		if err != nil {
-			log.Fatalf("error: %v", err)
+			return nil, fmt.Errorf("load profile: read yaml from disk %q: %w", configLocation+"/"+configName, err)
 		}
-		ipList = LoadYAMLStructure(yamlData)
+		return LoadYAMLStructure(yamlData), nil
 
 	// READ NetworkConfig FROM CR
 	case "cr":
 		retrievedConfig, err := GetNetworkConfig(configName, configLocation)
 		if err != nil {
-			log.Fatalf("Failed to get NetworkConfig: %v", err)
+			// A missing CR is not an error: the app self-bootstraps. Start with
+			// an empty config so the server stays usable; the first network/IP
+			// write creates the CR via CreateOrUpdateNetworkConfig.
+			if apierrors.IsNotFound(err) {
+				pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace).Info(
+					"NetworkConfig not found, starting with empty config (will be created on first write)",
+					pterm.DefaultLogger.Args("name", configName, "namespace", configLocation),
+				)
+				return map[string]IPs{}, nil
+			}
+			return nil, fmt.Errorf("load profile: get networkconfig %q in namespace %q: %w", configName, configLocation, err)
 		}
-		ipList = ConvertFromCRFormat(retrievedConfig.Spec.Networks)
+		return ConvertFromCRFormat(retrievedConfig.Spec.Networks), nil
 
 	default:
-		log.Fatalf("INVALID LOAD_CONFIG_FROM VALUE: %s", source)
+		return nil, fmt.Errorf("load profile: invalid LOAD_CONFIG_FROM value: %q", source)
 	}
-
-	return
 }
 
 // FUNCTION TO GET A NETWORKCONFIG RESOURCE

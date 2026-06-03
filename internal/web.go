@@ -55,6 +55,20 @@ func buildFQDN(cluster, zone string) string {
 	return fmt.Sprintf("*.%s.%s", cluster, zone)
 }
 
+// loadProfileHTTP loads the network config for an HTTP request. On failure it
+// logs the error, writes a 500 response, and returns ok=false so the handler
+// can return immediately. This keeps a missing/unreachable config from taking
+// down the whole server — only the affected request fails.
+func loadProfileHTTP(w http.ResponseWriter, loadFrom, configLoc, configNm string) (map[string]IPs, bool) {
+	ipList, err := LoadProfile(loadFrom, configLoc, configNm)
+	if err != nil {
+		log.Printf("FAILED TO LOAD NETWORK CONFIG: %v", err)
+		http.Error(w, "failed to load network config", http.StatusInternalServerError)
+		return nil, false
+	}
+	return ipList, true
+}
+
 // StartWebServer starts the HTTP server for HTMX frontend and REST API
 func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	mux := http.NewServeMux()
@@ -207,7 +221,10 @@ type dashboardData struct {
 }
 
 func handleDashboard(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 	pools := getPoolInfos(ipList)
 
 	data := dashboardData{
@@ -225,7 +242,10 @@ func handleDashboard(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 
 func handleNetworkDetail(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
 	networkKey := r.PathValue("key")
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	ips, ok := ipList[networkKey]
 	if !ok {
@@ -265,7 +285,10 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	ipKey, err := TruncateIP(ip)
 	if err != nil {
@@ -315,7 +338,10 @@ func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	ip := r.FormValue("ip")
 	networkKey := r.FormValue("network_key")
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	ipKey, err := TruncateIP(ip)
 	if err != nil {
@@ -358,7 +384,10 @@ func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configL
 // --- REST API Handlers ---
 
 func handleAPINetworks(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 	pools := getPoolInfos(ipList)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -367,7 +396,10 @@ func handleAPINetworks(w http.ResponseWriter, r *http.Request, loadFrom, configL
 
 func handleAPINetworkIPs(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	networkKey := r.PathValue("key")
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	ips, ok := ipList[networkKey]
 	if !ok {
@@ -417,7 +449,10 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		req.Status = "ASSIGNED"
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	if _, ok := ipList[networkKey]; !ok {
 		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
@@ -489,7 +524,10 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		req.Status = "ASSIGNED"
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	networkIPs, ok := ipList[networkKey]
 	if !ok {
@@ -558,7 +596,10 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	if _, ok := ipList[networkKey]; !ok {
 		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
@@ -613,7 +654,10 @@ func handleAPIRenewLease(w http.ResponseWriter, r *http.Request, loadFrom, confi
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	if _, ok := ipList[networkKey]; !ok {
 		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
@@ -664,7 +708,10 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	// CIDR mode: expand CIDR notation into networks
 	if req.CIDR != "" {
@@ -752,7 +799,10 @@ func handleAPICreateNetworkFromCIDR(w http.ResponseWriter, r *http.Request, load
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	createdKeys := []string{}
 	totalIPs := 0
@@ -785,7 +835,10 @@ func handleAPICreateNetworkFromCIDR(w http.ResponseWriter, r *http.Request, load
 
 func handleAPIDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
 	networkKey := r.PathValue("key")
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	if _, ok := ipList[networkKey]; !ok {
 		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
@@ -819,7 +872,10 @@ func handleAPIAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	if _, ok := ipList[networkKey]; !ok {
 		http.Error(w, `{"error":"network not found"}`, http.StatusNotFound)
@@ -852,7 +908,10 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 		ip = strings.TrimPrefix(ip, networkKey+".")
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	network, ok := ipList[networkKey]
 	if !ok {
@@ -917,7 +976,10 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	network, ok := ipList[networkKey]
 	if !ok {
@@ -968,7 +1030,10 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 // --- Cluster Info Handlers ---
 
 func handleAPIClusters(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	clusters := map[string][]map[string]string{}
 	for networkKey, ips := range ipList {
@@ -999,7 +1064,10 @@ func handleAPIClusters(w http.ResponseWriter, r *http.Request, loadFrom, configL
 
 func handleAPIClusterInfo(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
 	clusterName := r.PathValue("name")
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	type ipInfo struct {
 		Network string `json:"network"`
@@ -1103,7 +1171,10 @@ func handleHTMXAddNetwork(w http.ResponseWriter, r *http.Request, loadFrom, conf
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	if _, exists := ipList[network]; exists {
 		http.Error(w, "Network already exists", http.StatusConflict)
@@ -1136,7 +1207,10 @@ func handleHTMXAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	if _, ok := ipList[networkKey]; !ok {
 		http.Error(w, "Network not found", http.StatusNotFound)
@@ -1174,7 +1248,10 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	ipDigit, err := GetLastIPDigit(ip)
 	if err != nil {
@@ -1223,7 +1300,10 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 		return
 	}
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 
 	ipKey, err := TruncateIP(ip)
 	if err != nil {
@@ -1310,7 +1390,10 @@ func handleHTMXDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, c
 
 	networkKey := r.FormValue("network_key")
 
-	ipList := LoadProfile(loadFrom, configLoc, configNm)
+	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	if !ok {
+		return
+	}
 	delete(ipList, networkKey)
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 

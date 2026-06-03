@@ -277,7 +277,10 @@ func TestHandleAPIAssignWithLease(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	ipList := LoadProfile("disk", dir, name)
+	ipList, err := LoadProfile("disk", dir, name)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
 	entry := ipList["10.31.103"]["7"]
 	if entry.Status != "ASSIGNED" || entry.Cluster != "newcluster" {
 		t.Errorf("entry not assigned: %+v", entry)
@@ -331,7 +334,10 @@ func TestHandleAPIReserveAcceptsCamelCaseCreateDNS(t *testing.T) {
 	}
 
 	// Persisted entry should match — cluster kept intact, :DNS suffix set.
-	ipList := LoadProfile("disk", dir, name)
+	ipList, err := LoadProfile("disk", dir, name)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
 	digit := strings.TrimPrefix(resp.IP, "10.31.103.")
 	entry := ipList["10.31.103"][digit]
 	if entry.Cluster != "smoke-alloc" {
@@ -356,7 +362,11 @@ func TestHandleAPIAssignAcceptsCamelCaseCreateDNS(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	entry := LoadProfile("disk", dir, name)["10.31.103"]["7"]
+	profile, err := LoadProfile("disk", dir, name)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+	entry := profile["10.31.103"]["7"]
 	if entry.Cluster != "smoke-assign" {
 		t.Errorf("cluster: got %q, want %q", entry.Cluster, "smoke-assign")
 	}
@@ -381,7 +391,11 @@ func TestHandleAPIEditIPDoesNotDoubleSuffixDNS(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	entry := LoadProfile("disk", dir, name)["10.31.103"]["6"]
+	profile, err := LoadProfile("disk", dir, name)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+	entry := profile["10.31.103"]["6"]
 	if entry.Status != "ASSIGNED:DNS" {
 		t.Errorf("status: got %q, want %q (no double :DNS)", entry.Status, "ASSIGNED:DNS")
 	}
@@ -449,7 +463,10 @@ func TestHandleAPIRenewLease(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	ipList := LoadProfile("disk", dir, name)
+	ipList, err := LoadProfile("disk", dir, name)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
 	entry := ipList["10.31.103"]["6"]
 	if entry.LeaseExpiresAt < before+7200 || entry.LeaseExpiresAt > after+7200 {
 		t.Errorf("unexpected LeaseExpiresAt after renew: %d", entry.LeaseExpiresAt)
@@ -492,7 +509,10 @@ func TestHandleAPIReleaseClearsLease(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	ipList := LoadProfile("disk", dir, name)
+	ipList, err := LoadProfile("disk", dir, name)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
 	entry := ipList["10.31.103"]["7"]
 	if entry.LeaseExpiresAt != 0 {
 		t.Errorf("expected lease cleared after release, got %d", entry.LeaseExpiresAt)
