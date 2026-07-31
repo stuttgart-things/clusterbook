@@ -1,3 +1,12 @@
+## [1.25.10](https://github.com/stuttgart-things/clusterbook/compare/v1.25.9...v1.25.10) (2026-07-31)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes monorepo to v0.36.3 ([#170](https://github.com/stuttgart-things/clusterbook/issues/170)) ([895f6b0](https://github.com/stuttgart-things/clusterbook/commit/895f6b047bc600ee67b88685777e2b58d3c8069d))
+* **deps:** update module golang.org/x/crypto to v0.54.0 ([#168](https://github.com/stuttgart-things/clusterbook/issues/168)) ([37e5efb](https://github.com/stuttgart-things/clusterbook/commit/37e5efba732512c36c9c6cc1d523050e60622afb))
+* **deps:** update module google.golang.org/grpc to v1.82.1 [security] ([#172](https://github.com/stuttgart-things/clusterbook/issues/172)) ([61bb812](https://github.com/stuttgart-things/clusterbook/commit/61bb812acc44344dc248c475d840684cf0c2d5f7))
+
 ## [1.25.9](https://github.com/stuttgart-things/clusterbook/compare/v1.25.8...v1.25.9) (2026-06-03)
 
 
