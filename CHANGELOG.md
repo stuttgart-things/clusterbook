@@ -1,3 +1,10 @@
+## [1.25.13](https://github.com/stuttgart-things/clusterbook/compare/v1.25.12...v1.25.13) (2026-08-25)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/stretchr/testify to v1.12.1 ([#176](https://github.com/stuttgart-things/clusterbook/issues/176)) ([5947744](https://github.com/stuttgart-things/clusterbook/commit/59477441101d2d20ca4c8ab7774de997a56ec6f8))
+
 ## [1.25.12](https://github.com/stuttgart-things/clusterbook/compare/v1.25.11...v1.25.12) (2026-08-25)
 
 
