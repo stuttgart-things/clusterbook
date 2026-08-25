@@ -1,3 +1,12 @@
+## [1.25.12](https://github.com/stuttgart-things/clusterbook/compare/v1.25.11...v1.25.12) (2026-08-25)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/crossplane/crossplane-runtime/v2 to v2.4.0 ([#178](https://github.com/stuttgart-things/clusterbook/issues/178)) ([5206ac7](https://github.com/stuttgart-things/clusterbook/commit/5206ac713252d432d31ff50ea9862503a654bf07))
+* **deps:** update module golang.org/x/crypto to v0.55.0 ([#175](https://github.com/stuttgart-things/clusterbook/issues/175)) ([6a3b0ff](https://github.com/stuttgart-things/clusterbook/commit/6a3b0ff823e692e29f0a441f13f0dc89fcd360b6))
+* **deps:** update module google.golang.org/protobuf to v1.36.12 ([#174](https://github.com/stuttgart-things/clusterbook/issues/174)) ([3a3004f](https://github.com/stuttgart-things/clusterbook/commit/3a3004f0945df7b160ee20a76648059f8cd19594))
+
 ## [1.25.11](https://github.com/stuttgart-things/clusterbook/compare/v1.25.10...v1.25.11) (2026-07-31)
 
 
