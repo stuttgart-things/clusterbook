@@ -1,3 +1,12 @@
+## [1.25.14](https://github.com/stuttgart-things/clusterbook/compare/v1.25.13...v1.25.14) (2026-08-25)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes monorepo to v0.36.4 ([#180](https://github.com/stuttgart-things/clusterbook/issues/180)) ([88fe588](https://github.com/stuttgart-things/clusterbook/commit/88fe5887c96104f0ba9b5153fa3ebad32bf3692f))
+* **deps:** update module github.com/crossplane/crossplane-runtime to v1.20.11 ([#181](https://github.com/stuttgart-things/clusterbook/issues/181)) ([36dd45b](https://github.com/stuttgart-things/clusterbook/commit/36dd45b51d41f74fe4fc49b0e761922bcb608181))
+* **deps:** update module google.golang.org/grpc to v1.83.2 ([#177](https://github.com/stuttgart-things/clusterbook/issues/177)) ([a237887](https://github.com/stuttgart-things/clusterbook/commit/a237887d44d75868a77fdc1877e75a5de4d0ef71))
+
 ## [1.25.13](https://github.com/stuttgart-things/clusterbook/compare/v1.25.12...v1.25.13) (2026-08-25)
 
 
