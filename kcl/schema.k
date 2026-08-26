@@ -29,7 +29,15 @@ schema ClusterBook:
     # Config
     loadConfigFrom: str = "cr"
     configLocation: str = "clusterbook"
-    configName: str = "networks-labul"
+    # Lab-NEUTRAL. This was "networks-labul": a name belonging to one
+    # installation, baked into the artifact everyone pulls. A second lab either
+    # had to name its NetworkConfig after somebody else's, or read a pool that
+    # is not its own and find no addresses -- with nothing in the config
+    # pointing at the reason.
+    #
+    # Every deployment should set config.configName explicitly; this default is
+    # only what an unconfigured one gets.
+    configName: str = "networks"
     serverPort: str = "50051"
 
     # Service
