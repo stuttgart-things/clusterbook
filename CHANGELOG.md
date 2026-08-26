@@ -1,3 +1,10 @@
+## [1.25.15](https://github.com/stuttgart-things/clusterbook/compare/v1.25.14...v1.25.15) (2026-08-26)
+
+
+### Bug Fixes
+
+* **kcl:** the configName default named one lab ([#182](https://github.com/stuttgart-things/clusterbook/issues/182)) ([88d61e0](https://github.com/stuttgart-things/clusterbook/commit/88d61e001b90701b160a4a70bdbea619a0ccd05d))
+
 ## [1.25.14](https://github.com/stuttgart-things/clusterbook/compare/v1.25.13...v1.25.14) (2026-08-25)
 
 
