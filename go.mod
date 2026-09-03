@@ -7,7 +7,7 @@ require (
 	github.com/pterm/pterm v0.12.83
 	github.com/stretchr/testify v1.12.1
 	go.hein.dev/go-version v0.1.0
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v2 v2.4.0
