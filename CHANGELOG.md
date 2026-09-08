@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/stuttgart-things/clusterbook/compare/v1.25.16...v1.26.0) (2026-09-08)
+
+
+### Features
+
+* report DNS outcome in API responses and fix DD-WRT reload ([#187](https://github.com/stuttgart-things/clusterbook/issues/187)) ([7ba8037](https://github.com/stuttgart-things/clusterbook/commit/7ba80377ab3b5e9801d72f65b520777c365322ee))
+
 ## [1.25.16](https://github.com/stuttgart-things/clusterbook/compare/v1.25.15...v1.25.16) (2026-09-08)
 
 
