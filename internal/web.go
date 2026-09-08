@@ -303,9 +303,15 @@ func getIPEntries(ips IPs, networkKey string) []IPEntry {
 	return entries
 }
 
-// writeJSON writes a JSON response body with the correct content type.
+// writeJSON writes a 200 JSON response body with the correct content type.
 func writeJSON(w http.ResponseWriter, body any) {
+	writeJSONStatus(w, http.StatusOK, body)
+}
+
+// writeJSONStatus writes a JSON response body under an explicit status code.
+func writeJSONStatus(w http.ResponseWriter, code int, body any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(body); err != nil {
 		log.Printf("encode response: %v", err)
 	}
@@ -500,8 +506,7 @@ func handleAPINetworks(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	}
 	pools := getPoolInfos(ipList)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(pools)
+	writeJSON(w, pools)
 }
 
 func handleAPINetworkIPs(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
@@ -525,8 +530,7 @@ func handleAPINetworkIPs(w http.ResponseWriter, r *http.Request, loadFrom, confi
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(entries)
+	writeJSON(w, entries)
 }
 
 func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
@@ -790,8 +794,7 @@ func handleAPIRenewLease(w http.ResponseWriter, r *http.Request, loadFrom, confi
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, map[string]any{
 		"status":           "ok",
 		"ip":               ip,
 		"lease_expires_at": entry.LeaseExpiresAt,
@@ -846,9 +849,7 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 
 		saveConfig(ipList, loadFrom, configLoc, configNm)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		writeJSONStatus(w, http.StatusCreated, map[string]any{
 			"status":   "ok",
 			"message":  fmt.Sprintf("Created %d network(s) with %d IPs from CIDR %s", len(createdKeys), totalIPs, req.CIDR),
 			"networks": createdKeys,
@@ -874,9 +875,7 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSONStatus(w, http.StatusCreated, map[string]any{
 		"status":  "ok",
 		"message": fmt.Sprintf("Network %s created with %d IPs", req.Network, len(req.IPs)),
 	})
@@ -929,9 +928,7 @@ func handleAPICreateNetworkFromCIDR(w http.ResponseWriter, r *http.Request, load
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSONStatus(w, http.StatusCreated, map[string]any{
 		"status":   "ok",
 		"message":  fmt.Sprintf("Created %d network(s) with %d IPs from CIDR %s", len(createdKeys), totalIPs, req.CIDR),
 		"networks": createdKeys,
@@ -953,8 +950,7 @@ func handleAPIDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 	delete(ipList, networkKey)
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, map[string]any{
 		"status":  "ok",
 		"message": fmt.Sprintf("Network %s deleted", networkKey),
 	})
@@ -997,9 +993,7 @@ func handleAPIAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSONStatus(w, http.StatusCreated, map[string]any{
 		"status":  "ok",
 		"message": fmt.Sprintf("Added %d IPs to network %s", added, networkKey),
 	})
@@ -1158,8 +1152,7 @@ func handleAPIClusters(w http.ResponseWriter, r *http.Request, loadFrom, configL
 		result = append(result, clusterSummary{Cluster: name, IPCount: len(ips)})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	writeJSON(w, result)
 }
 
 func handleAPIClusterInfo(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
@@ -1207,8 +1200,7 @@ func handleAPIClusterInfo(w http.ResponseWriter, r *http.Request, loadFrom, conf
 		result["zone"] = zone
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	writeJSON(w, result)
 }
 
 func handleAPIZone(w http.ResponseWriter, r *http.Request, pdns *PDNSClient, ddwrt *DDWRTClient) {
@@ -1239,8 +1231,7 @@ func handleAPIZone(w http.ResponseWriter, r *http.Request, pdns *PDNSClient, ddw
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	writeJSON(w, result)
 }
 
 // --- HTMX CRUD Handlers ---
@@ -1327,11 +1318,7 @@ func handleHTMXAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 
 	// Re-render the IP table
 	entries := getIPEntries(ipList[networkKey], networkKey)
-	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
-	tmpl.Execute(w, struct {
-		NetworkKey string
-		Entries    []IPEntry
-	}{networkKey, entries})
+	renderIPTable(w, networkKey, entries, dnsResult{})
 }
 
 func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {

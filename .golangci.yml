@@ -1,9 +1,22 @@
-run:
-  timeout: 10m
-
-issues:
-  exclude-files:
-    - main_test.go
-
-  exclude-dirs:
-    - tests
+version: "2"
+linters:
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - main_test.go
+      - tests
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

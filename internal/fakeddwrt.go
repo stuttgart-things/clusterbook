@@ -147,7 +147,7 @@ func (s *FakeDDWRTServer) handleConn(nConn net.Conn) {
 
 	for newChan := range chans {
 		if newChan.ChannelType() != "session" {
-			newChan.Reject(ssh.UnknownChannelType, "unsupported channel type")
+			_ = newChan.Reject(ssh.UnknownChannelType, "unsupported channel type")
 			continue
 		}
 		ch, requests, err := newChan.Accept()
@@ -163,31 +163,31 @@ func (s *FakeDDWRTServer) handleSession(ch ssh.Channel, requests <-chan *ssh.Req
 	for req := range requests {
 		if req.Type != "exec" {
 			if req.WantReply {
-				req.Reply(false, nil)
+				_ = req.Reply(false, nil)
 			}
 			continue
 		}
 
 		// Decode the command from the exec payload (4-byte length prefix + command)
 		if len(req.Payload) < 4 {
-			req.Reply(false, nil)
+			_ = req.Reply(false, nil)
 			continue
 		}
 		cmdLen := int(req.Payload[0])<<24 | int(req.Payload[1])<<16 | int(req.Payload[2])<<8 | int(req.Payload[3])
 		if len(req.Payload) < 4+cmdLen {
-			req.Reply(false, nil)
+			_ = req.Reply(false, nil)
 			continue
 		}
 		fullCmd := string(req.Payload[4 : 4+cmdLen])
-		req.Reply(true, nil)
+		_ = req.Reply(true, nil)
 
 		output, status := s.executeCompound(fullCmd)
-		ch.Write([]byte(output))
+		_, _ = ch.Write([]byte(output))
 
 		exitStatus := []byte{
 			byte(status >> 24), byte(status >> 16), byte(status >> 8), byte(status),
 		}
-		ch.SendRequest("exit-status", false, exitStatus)
+		_, _ = ch.SendRequest("exit-status", false, exitStatus)
 		return
 	}
 }
