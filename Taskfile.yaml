@@ -9,16 +9,10 @@ vars:
     sh: if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then echo $(git rev-parse --abbrev-ref HEAD); else echo main ; fi
   ORGA_NAME: stuttgart-things
   MODULE: github.com/{{ .ORGA_NAME }}/{{ .PROJECT_NAME }}
-  CHART_DIR: helm
-  CHART_VERSION:
-    sh: grep 'version:' ./{{ .CHART_DIR }}/{{ .PROJECT_NAME }}/Chart.yaml | head -n1 | awk '{ print $2 }'
   DATE:
     sh: date -Ih
   GIT_COMMIT:
     sh: git log -n 1 --format=%h
-  PATH_HELMFILE: helm/helmfile.yaml
-  PATH_HELM_ENV: helm/env
-  K8S_ENV: dev
   VERSION:
     sh: |
       [ "$(git branch --show-current)" != "main" ] && echo "dev-$(git describe --tags --abbrev=0)" || echo $(git describe --tags --abbrev=0)
@@ -45,25 +39,6 @@ tasks:
     desc: "Run pre-commit hooks"
     cmds:
       - pre-commit run -a
-
-  helm-push:
-    desc: Push helm chart
-    cmds:
-      - dagger call -m {{ .DAGGER_HELM_MODULE }}@{{ .DAGGER_HELM_MODULE_VERSION }} push --src {{ .CHART }} --progress plain --username {{ .USERNAME }} --password=env:GITHUB_TOKEN --registry {{ .PACKAGE_REGISTRY }} --repository {{ .REPOSITORY_NAME }}
-    vars:
-      DAGGER_HELM_MODULE: github.com/stuttgart-things/dagger/helm
-      DAGGER_HELM_MODULE_VERSION: v0.0.3
-      CHART: helm/clusterbook
-      PACKAGE_REGISTRY: ghcr.io
-      USERNAME: stuttgart-things
-      REPOSITORY_NAME: stuttgart-things/clusterbook
-
-  deploy:
-    desc: Deploy to cluster
-    deps: [build-ko]
-    cmds:
-      - helmfile apply -f {{ .PATH_HELMFILE }} -e {{ .K8S_ENV }}
-      - helmfile test -f {{ .PATH_HELMFILE }} -e {{ .K8S_ENV }}
 
   run:
     desc: Run
@@ -96,7 +71,6 @@ tasks:
     deps: [build]
     cmds:
       - "go run tests/client/client.go"
-#helm test clusterbook -n clusterbook
 
   build:
     desc: Install
@@ -123,17 +97,7 @@ tasks:
         skopeo copy --src-tls-verify=false --dest-tls-verify=false docker://${BUILD_IMAGE} docker://{{ .RELEASE_IMAGE }}:${VERSION}
         BUILD_IMAGE={{ .RELEASE_IMAGE }}:${VERSION}
         {{ end }}
-
-        # UPDATE HELM CHART
-        sed -i "s|^\(\s*image:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $1}')|" {{ .CHART_DIR }}/{{ .PROJECT_NAME }}/values.yaml
-        sed -i "s|^\(\s*tag:\s*\).*|\1$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')|" {{ .CHART_DIR }}//{{ .PROJECT_NAME }}/values.yaml
-        sed -i "s/^version: .*/version: ${VERSION}-chart/" {{ .META_PATH }}
-        sed -i "s/^appVersion: .*/appVersion: ${VERSION}/" {{ .META_PATH }}
-
-        # UPDATE HELMFILE
-        yq eval ".imageTag = \"$(echo ${BUILD_IMAGE} | awk -F':' '{print $2}')\"" -i {{ .PATH_HELM_ENV }}/{{ .K8S_ENV }}.yaml
     vars:
-      META_PATH: '{{ .CHART_DIR }}/{{ .PROJECT_NAME }}/Chart.yaml'
       RELEASE_IMAGE: ghcr.io/stuttgart-things/clusterbook
       VERSION:
         sh: |
@@ -279,7 +243,6 @@ tasks:
         vars:
           BRANCH: main
           RELEASE: "true"
-      - task: helm-push
-      - | # PUSH UPDATED CHART
+      - | # PUSH RELEASE COMMIT
         COMMIT_MESSAGE=$(echo updated for version $(git describe --tags --abbrev=0))
         git commit --allow-empty -a -m "$(echo ${COMMIT_MESSAGE})" && git push origin -u main
