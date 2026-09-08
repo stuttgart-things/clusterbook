@@ -2,8 +2,10 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -130,7 +132,7 @@ func TestAssignIP(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL)
-	err := c.AssignIP("10.31.103", "10.31.103.5", "mycluster", "ASSIGNED", false)
+	err := c.AssignIP("10.31.103", "10.31.103.5", "mycluster", "ASSIGNED", false, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -282,5 +284,94 @@ func TestCreateNetworkFromCIDR(t *testing.T) {
 	err := c.CreateNetworkFromCIDR("10.31.103.0/24", []string{"0", "255"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestAssignIPDNSFailure covers issue #187: clusterbook answers 200 even when
+// the DNS record was not written, so a client that only checks the status code
+// reports success for a half-completed operation.
+func TestAssignIPDNSFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":    "ok",
+			"dns":       "failed",
+			"dns_error": "ddwrt reload dnsmasq: no working reload command",
+		})
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	err := c.AssignIP("10.31.103", "10.31.103.5", "mycluster", "ASSIGNED", true, 0)
+	if err == nil {
+		t.Fatal("expected an error when the server reports dns: failed")
+	}
+
+	var dnsErr *DNSError
+	if !errors.As(err, &dnsErr) {
+		t.Fatalf("expected a *DNSError, got %T: %v", err, err)
+	}
+	if !strings.Contains(dnsErr.Error(), "no working reload command") {
+		t.Errorf("error should carry the server detail, got: %v", dnsErr)
+	}
+}
+
+// TestAssignIPDNSOK and the "skipped" case must not be mistaken for failures.
+func TestAssignIPDNSNonFailureVerdicts(t *testing.T) {
+	for _, verdict := range []string{"ok", "skipped", ""} {
+		t.Run("dns="+verdict, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body := map[string]string{"status": "ok"}
+				if verdict != "" {
+					body["dns"] = verdict
+				}
+				json.NewEncoder(w).Encode(body)
+			}))
+			defer srv.Close()
+
+			c := NewClient(srv.URL)
+			if err := c.AssignIP("10.31.103", "10.31.103.5", "mycluster", "ASSIGNED", true, 0); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestReleaseIPDNSFailure covers the release half of issue #187: a stale record
+// that was never withdrawn must not be reported as released.
+func TestReleaseIPDNSFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":    "ok",
+			"message":   "IP 10.31.103.5 released",
+			"dns":       "failed",
+			"dns_error": "ddwrt nvram commit: Process exited with status 127",
+		})
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	if err := c.ReleaseIP("10.31.103", "10.31.103.5"); err == nil {
+		t.Fatal("expected an error when the DNS record was not withdrawn")
+	}
+}
+
+// TestRenewLease checks the lease heartbeat endpoint and payload.
+func TestRenewLease(t *testing.T) {
+	var got map[string]interface{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/10.31.103/ips/10.31.103.5/renew" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		json.NewDecoder(r.Body).Decode(&got)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	if err := c.RenewLease("10.31.103", "10.31.103.5", 3600); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got["lease_duration_seconds"] != float64(3600) {
+		t.Errorf("expected lease_duration_seconds 3600, got %v", got["lease_duration_seconds"])
 	}
 }

@@ -5,6 +5,7 @@ Copyright © 2024 Patrick Hermann patrick.hermann@sva.de
 package internal
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -87,14 +88,33 @@ func TestLookupDNSEntry_NotFound(t *testing.T) {
 type fakeExecutor struct {
 	nvram map[string]string
 	calls []string
+
+	// fail lists commands that exit 127, so a test can model a router where
+	// restart_dnsmasq is not resolvable over non-interactive SSH (issue #187).
+	fail map[string]bool
+
+	// reloads counts the reload commands that succeeded.
+	reloads int
 }
 
-func newFakeExecutor() *fakeExecutor {
-	return &fakeExecutor{nvram: map[string]string{"dnsmasq_options": ""}}
+func newFakeExecutor(failing ...string) *fakeExecutor {
+	f := &fakeExecutor{
+		nvram: map[string]string{"dnsmasq_options": ""},
+		fail:  map[string]bool{},
+	}
+	for _, cmd := range failing {
+		f.fail[cmd] = true
+	}
+	return f
 }
 
 func (f *fakeExecutor) Run(cmd string) (string, error) {
 	f.calls = append(f.calls, cmd)
+
+	if f.fail[cmd] {
+		return "", fmt.Errorf("Process exited with status 127")
+	}
+
 	// Handle compound commands (cmd1 && cmd2 && cmd3)
 	for _, part := range strings.Split(cmd, "&&") {
 		part = strings.TrimSpace(part)
@@ -105,8 +125,10 @@ func (f *fakeExecutor) Run(cmd string) (string, error) {
 			val := strings.TrimPrefix(part, "nvram set dnsmasq_options=")
 			val = strings.Trim(val, "'")
 			f.nvram["dnsmasq_options"] = val
-		case part == "nvram commit", part == "restart_dnsmasq":
+		case part == "nvram commit", part == "stopservice dnsmasq":
 			// no-op
+		case part == "restart_dnsmasq", part == "startservice dnsmasq", part == "killall -HUP dnsmasq":
+			f.reloads++
 		}
 	}
 	return "", nil
@@ -358,5 +380,209 @@ func TestFakeDDWRTServer_WrongPassword(t *testing.T) {
 	err = client.CreateRecord("myapp", "10.31.103.6")
 	if err == nil {
 		t.Error("expected auth error with wrong password")
+	}
+}
+
+// ── Issue #187: the write must not be one `&&` chain ─────────────────────────
+
+// TestDDWRTClient_WriteRunsStepsSeparately pins the shape of the write. The old
+// `set && commit && restart_dnsmasq` chain reported one exit 127 that named
+// none of the three, which is what made the router's split state undiagnosable.
+func TestDDWRTClient_WriteRunsStepsSeparately(t *testing.T) {
+	exec := newFakeExecutor()
+	client := newDDWRTClientWithExecutor("sthings.lab", exec)
+
+	if err := client.CreateRecord("myapp", "10.31.103.6"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := []string{
+		"nvram get dnsmasq_options",
+		"nvram set dnsmasq_options='address=/myapp.sthings.lab/10.31.103.6'",
+		"nvram commit",
+		"restart_dnsmasq",
+	}
+	if len(exec.calls) != len(want) {
+		t.Fatalf("expected %d separate commands, got %d: %q", len(want), len(exec.calls), exec.calls)
+	}
+	for i, cmd := range want {
+		if exec.calls[i] != cmd {
+			t.Errorf("call %d: expected %q, got %q", i, cmd, exec.calls[i])
+		}
+		if strings.Contains(exec.calls[i], "&&") && !strings.HasPrefix(exec.calls[i], "stopservice") {
+			t.Errorf("call %d must not chain commands with &&: %q", i, exec.calls[i])
+		}
+	}
+}
+
+// TestDDWRTClient_FallsBackWhenRestartDnsmasqMissing is the exact reported
+// environment: restart_dnsmasq exits 127, everything else works.
+func TestDDWRTClient_FallsBackWhenRestartDnsmasqMissing(t *testing.T) {
+	exec := newFakeExecutor("restart_dnsmasq")
+	client := newDDWRTClientWithExecutor("sthings.lab", exec)
+
+	if err := client.CreateRecord("myapp", "10.31.103.6"); err != nil {
+		t.Fatalf("expected the fallback reload to succeed, got: %v", err)
+	}
+
+	if exec.nvram["dnsmasq_options"] != "address=/myapp.sthings.lab/10.31.103.6" {
+		t.Errorf("nvram not written: %q", exec.nvram["dnsmasq_options"])
+	}
+	if exec.reloads == 0 {
+		t.Error("dnsmasq was never reloaded — the record would not be served")
+	}
+}
+
+// TestDDWRTClient_FallsBackToKillall exercises the last resort in the chain.
+func TestDDWRTClient_FallsBackToKillall(t *testing.T) {
+	exec := newFakeExecutor("restart_dnsmasq", "stopservice dnsmasq && startservice dnsmasq")
+	client := newDDWRTClientWithExecutor("sthings.lab", exec)
+
+	if err := client.CreateRecord("myapp", "10.31.103.6"); err != nil {
+		t.Fatalf("expected killall -HUP to succeed, got: %v", err)
+	}
+	if exec.reloads != 1 {
+		t.Errorf("expected exactly one successful reload, got %d", exec.reloads)
+	}
+}
+
+// TestDDWRTClient_ReloadFailureIsNamedAndExplained checks the error text when
+// no reload command works: it must say the step and that NVRAM was committed,
+// because that is the split state an operator has to reconcile by hand.
+func TestDDWRTClient_ReloadFailureIsNamedAndExplained(t *testing.T) {
+	exec := newFakeExecutor("restart_dnsmasq", "stopservice dnsmasq && startservice dnsmasq", "killall -HUP dnsmasq")
+	client := newDDWRTClientWithExecutor("sthings.lab", exec)
+
+	err := client.CreateRecord("myapp", "10.31.103.6")
+	if err == nil {
+		t.Fatal("expected an error when no reload command works")
+	}
+
+	for _, want := range []string{"reload dnsmasq", "nvram committed", "restart_dnsmasq", "killall -HUP dnsmasq"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error should mention %q, got: %v", want, err)
+		}
+	}
+}
+
+// TestDDWRTClient_FailingStepIsNamed makes sure a failure in an earlier step is
+// not reported as the generic "write dnsmasq_options" it used to be.
+func TestDDWRTClient_FailingStepIsNamed(t *testing.T) {
+	tests := []struct {
+		name    string
+		failing string
+		want    string
+	}{
+		{"commit", "nvram commit", "ddwrt nvram commit"},
+		{"set", "nvram set dnsmasq_options='address=/myapp.sthings.lab/10.31.103.6'", "ddwrt nvram set dnsmasq_options"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exec := newFakeExecutor(tt.failing)
+			client := newDDWRTClientWithExecutor("sthings.lab", exec)
+
+			err := client.CreateRecord("myapp", "10.31.103.6")
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			if !strings.HasPrefix(err.Error(), tt.want) {
+				t.Errorf("expected error naming %q, got: %v", tt.want, err)
+			}
+		})
+	}
+}
+
+// TestDDWRTClient_DeleteRecordReloads guards the delete half: a record removed
+// from NVRAM but still served is exactly the stale-record case from the issue.
+func TestDDWRTClient_DeleteRecordReloads(t *testing.T) {
+	exec := newFakeExecutor()
+	exec.nvram["dnsmasq_options"] = "address=/myapp.sthings.lab/10.31.103.6"
+	client := newDDWRTClientWithExecutor("sthings.lab", exec)
+
+	if err := client.DeleteRecord("myapp"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exec.nvram["dnsmasq_options"] != "" {
+		t.Errorf("entry not removed: %q", exec.nvram["dnsmasq_options"])
+	}
+	if exec.reloads == 0 {
+		t.Error("dnsmasq was never reloaded — the record would still be served")
+	}
+}
+
+// ── Fake SSH server: the same behaviour over a real SSH stack ────────────────
+
+func TestDDWRTClient_RestartDnsmasqNotFound_FakeSSH(t *testing.T) {
+	srv, err := NewFakeDDWRTServer("root", "testpass")
+	if err != nil {
+		t.Fatalf("start fake server: %v", err)
+	}
+	defer srv.Close()
+
+	// The router in issue #187: restart_dnsmasq is not resolvable, exit 127.
+	srv.FailCommand("restart_dnsmasq")
+
+	client := &DDWRTClient{
+		Host:     srv.Addr,
+		User:     "root",
+		Password: "testpass",
+		Zone:     "sthings.lab",
+		logger:   pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace),
+	}
+
+	if err := client.CreateRecord("dnstest-probe", "192.168.10.173"); err != nil {
+		t.Fatalf("expected the fallback reload to carry the write through, got: %v", err)
+	}
+
+	if got := srv.NvramGet("dnsmasq_options"); got != "address=/dnstest-probe.sthings.lab/192.168.10.173" {
+		t.Errorf("unexpected nvram content: %q", got)
+	}
+
+	reloads, last := srv.Reloads()
+	if reloads == 0 {
+		t.Fatal("dnsmasq was never reloaded")
+	}
+	if last == "restart_dnsmasq" {
+		t.Errorf("reload should have come from a fallback, got %q", last)
+	}
+}
+
+func TestDDWRTClient_NoReloadCommandWorks_FakeSSH(t *testing.T) {
+	srv, err := NewFakeDDWRTServer("root", "testpass")
+	if err != nil {
+		t.Fatalf("start fake server: %v", err)
+	}
+	defer srv.Close()
+
+	for _, cmd := range dnsmasqReloadCommands {
+		for _, part := range strings.Split(cmd, "&&") {
+			srv.FailCommand(strings.TrimSpace(part))
+		}
+	}
+
+	client := &DDWRTClient{
+		Host:     srv.Addr,
+		User:     "root",
+		Password: "testpass",
+		Zone:     "sthings.lab",
+		logger:   pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace),
+	}
+
+	err = client.CreateRecord("dnstest-probe", "192.168.10.173")
+	if err == nil {
+		t.Fatal("expected an error when dnsmasq cannot be reloaded")
+	}
+	if !strings.Contains(err.Error(), "nvram committed") {
+		t.Errorf("error must state that nvram was committed, got: %v", err)
+	}
+
+	// The split state the issue describes: NVRAM holds the new value while the
+	// running daemon does not. The error is what makes it visible.
+	if got := srv.NvramGet("dnsmasq_options"); got == "" {
+		t.Error("expected nvram to hold the committed value")
+	}
+	if reloads, _ := srv.Reloads(); reloads != 0 {
+		t.Errorf("expected no successful reload, got %d", reloads)
 	}
 }

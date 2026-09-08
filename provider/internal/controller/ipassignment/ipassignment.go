@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -86,18 +87,23 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			return managed.ExternalObservation{}, errors.Wrap(err, errObserve)
 		}
 
-		var existing []string
+		var existing []client.IPEntry
 		for _, entry := range entries {
 			if entry.Cluster == cr.Spec.ForProvider.Cluster && strings.HasPrefix(entry.Status, "ASSIGNED") {
-				existing = append(existing, entry.IP)
+				existing = append(existing, entry)
 			}
 		}
 
 		if len(existing) > 0 && len(existing) >= cr.Spec.ForProvider.CountIPs {
-			cr.Status.AtProvider.IPAddresses = existing[:cr.Spec.ForProvider.CountIPs]
-			if len(cr.Status.AtProvider.IPAddresses) > 0 {
-				cr.Status.AtProvider.IPAddress = cr.Status.AtProvider.IPAddresses[0]
+			adopted := existing[:cr.Spec.ForProvider.CountIPs]
+			ips := make([]string, len(adopted))
+			for i, e := range adopted {
+				ips[i] = e.IP
 			}
+			cr.Status.AtProvider.IPAddresses = ips
+			cr.Status.AtProvider.IPAddress = ips[0]
+			cr.Status.AtProvider.FQDN = adopted[0].FQDN
+			cr.Status.AtProvider.LeaseExpiresAt = minLeaseExpiresAt(adopted)
 			meta.SetExternalName(cr, cr.Spec.ForProvider.Cluster+"/"+cr.Spec.ForProvider.NetworkKey)
 			cr.SetConditions(xpv1.Available())
 			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
@@ -117,23 +123,22 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		entryMap[entry.IP] = entry
 	}
 
-	allValid := true
+	observed := make([]client.IPEntry, 0, len(cr.Status.AtProvider.IPAddresses))
 	for _, ip := range cr.Status.AtProvider.IPAddresses {
 		entry, exists := entryMap[ip]
 		if !exists || entry.Cluster != cr.Spec.ForProvider.Cluster {
-			allValid = false
-			break
+			return managed.ExternalObservation{ResourceExists: false}, nil
 		}
+		observed = append(observed, entry)
 	}
 
-	if !allValid {
-		return managed.ExternalObservation{ResourceExists: false}, nil
-	}
+	// Refresh status from observed state.
+	cr.Status.AtProvider.FQDN = observed[0].FQDN
+	cr.Status.AtProvider.LeaseExpiresAt = minLeaseExpiresAt(observed)
 
 	// Check if status/cluster needs update.
 	upToDate := true
-	for _, ip := range cr.Status.AtProvider.IPAddresses {
-		entry := entryMap[ip]
+	for _, entry := range observed {
 		expectedStatus := cr.Spec.ForProvider.Status
 		if cr.Spec.ForProvider.CreateDNS {
 			expectedStatus += ":DNS"
@@ -144,8 +149,36 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
+	// Heartbeat renewal: when a lease duration is requested, consider the
+	// resource out-of-date once the remaining TTL drops below half the desired
+	// duration, so Update() renews it.
+	if upToDate && cr.Spec.ForProvider.LeaseDurationSeconds > 0 {
+		threshold := time.Now().Unix() + cr.Spec.ForProvider.LeaseDurationSeconds/2
+		for _, entry := range observed {
+			if entry.LeaseExpiresAt == 0 || entry.LeaseExpiresAt < threshold {
+				upToDate = false
+				break
+			}
+		}
+	}
+
 	cr.SetConditions(xpv1.Available())
 	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: upToDate}, nil
+}
+
+// minLeaseExpiresAt returns the earliest lease expiry across entries, or 0
+// if any entry has no lease (meaning the set as a whole has no lease horizon).
+func minLeaseExpiresAt(entries []client.IPEntry) int64 {
+	var min int64
+	for i, e := range entries {
+		if e.LeaseExpiresAt == 0 {
+			return 0
+		}
+		if i == 0 || e.LeaseExpiresAt < min {
+			min = e.LeaseExpiresAt
+		}
+	}
+	return min
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -177,6 +210,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 			cr.Spec.ForProvider.Cluster,
 			status,
 			cr.Spec.ForProvider.CreateDNS,
+			cr.Spec.ForProvider.LeaseDurationSeconds,
 		); err != nil {
 			return managed.ExternalCreation{}, errors.Wrap(err, fmt.Sprintf("assigning IP %s", entry.IP))
 		}
@@ -186,6 +220,9 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr.Status.AtProvider.IPAddresses = assignedIPs
 	if len(assignedIPs) > 0 {
 		cr.Status.AtProvider.IPAddress = assignedIPs[0]
+	}
+	if cr.Spec.ForProvider.LeaseDurationSeconds > 0 {
+		cr.Status.AtProvider.LeaseExpiresAt = time.Now().Unix() + cr.Spec.ForProvider.LeaseDurationSeconds
 	}
 
 	meta.SetExternalName(cr, cr.Spec.ForProvider.Cluster+"/"+cr.Spec.ForProvider.NetworkKey)
@@ -220,6 +257,16 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		); err != nil {
 			return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 		}
+
+		if cr.Spec.ForProvider.LeaseDurationSeconds > 0 {
+			if err := e.client.RenewLease(cr.Spec.ForProvider.NetworkKey, ip, cr.Spec.ForProvider.LeaseDurationSeconds); err != nil {
+				return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
+			}
+		}
+	}
+
+	if cr.Spec.ForProvider.LeaseDurationSeconds > 0 {
+		cr.Status.AtProvider.LeaseExpiresAt = time.Now().Unix() + cr.Spec.ForProvider.LeaseDurationSeconds
 	}
 
 	return managed.ExternalUpdate{}, nil

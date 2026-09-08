@@ -82,6 +82,13 @@ type IPAssignmentParameters struct {
 	// CreateDNS controls whether DNS records should be created.
 	// +kubebuilder:default=false
 	CreateDNS bool `json:"createDns,omitempty"`
+
+	// LeaseDurationSeconds sets a TTL (in seconds) on the assignment.
+	// When > 0, the assignment is auto-reclaimed after expiry unless
+	// renewed. The controller keeps the lease alive by renewing it
+	// whenever the observed remaining time drops below half the duration.
+	// +kubebuilder:validation:Minimum=0
+	LeaseDurationSeconds int64 `json:"leaseDurationSeconds,omitempty"`
 }
 
 // IPAssignmentObservation holds the observed state from clusterbook.
@@ -91,6 +98,13 @@ type IPAssignmentObservation struct {
 
 	// IPAddress is the first assigned IP address (convenience field).
 	IPAddress string `json:"ipAddress,omitempty"`
+
+	// FQDN is the wildcard DNS name for the cluster (when CreateDNS is set).
+	FQDN string `json:"fqdn,omitempty"`
+
+	// LeaseExpiresAt is the unix timestamp (seconds) at which the
+	// assignment's lease expires. Zero means no lease.
+	LeaseExpiresAt int64 `json:"leaseExpiresAt,omitempty"`
 }
 
 // IPAssignmentSpec defines the desired state of IPAssignment.

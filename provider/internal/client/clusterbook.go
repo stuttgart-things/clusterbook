@@ -35,10 +35,12 @@ type NetworkPool struct {
 
 // IPEntry holds a single IP entry (matches IPEntry from web.go).
 type IPEntry struct {
-	IP      string `json:"IP"`
-	Digit   string `json:"Digit"`
-	Status  string `json:"Status"`
-	Cluster string `json:"Cluster"`
+	IP             string `json:"ip"`
+	Digit          string `json:"digit"`
+	Status         string `json:"status"`
+	Cluster        string `json:"cluster"`
+	FQDN           string `json:"fqdn,omitempty"`
+	LeaseExpiresAt int64  `json:"lease_expires_at,omitempty"`
 }
 
 // ListNetworks returns all network pools.
@@ -119,15 +121,27 @@ func (c *Client) DeleteNetwork(networkKey string) error {
 	return nil
 }
 
-// AssignIP assigns an IP address to a cluster.
-func (c *Client) AssignIP(networkKey, ip, cluster, status string, createDNS bool) error {
+// AssignIP assigns an IP address to a cluster. When leaseDurationSeconds > 0,
+// the assignment carries a TTL and will be auto-reclaimed after expiry.
+func (c *Client) AssignIP(networkKey, ip, cluster, status string, createDNS bool, leaseDurationSeconds int64) error {
 	body := map[string]interface{}{
 		"ip":         ip,
 		"cluster":    cluster,
 		"status":     status,
 		"create_dns": createDNS,
 	}
+	if leaseDurationSeconds > 0 {
+		body["lease_duration_seconds"] = leaseDurationSeconds
+	}
 	return c.postJSON("/api/v1/networks/"+networkKey+"/assign", body, http.StatusOK)
+}
+
+// RenewLease extends an existing assignment's lease by the given duration.
+func (c *Client) RenewLease(networkKey, ip string, leaseDurationSeconds int64) error {
+	body := map[string]interface{}{
+		"lease_duration_seconds": leaseDurationSeconds,
+	}
+	return c.postJSON("/api/v1/networks/"+networkKey+"/ips/"+ip+"/renew", body, http.StatusOK)
 }
 
 // ReleaseIP releases an IP address.
@@ -219,6 +233,22 @@ func (c *Client) NetworkExists(networkKey string) (bool, *NetworkPool, error) {
 	return false, nil, nil
 }
 
+// DNSError reports that the IP operation itself succeeded but the DNS record
+// was not written. clusterbook answers 200 in that case and states the outcome
+// in the response body, so a caller that only checks the status code would
+// believe the record exists.
+type DNSError struct {
+	Path   string
+	Detail string
+}
+
+func (e *DNSError) Error() string {
+	if e.Detail == "" {
+		return fmt.Sprintf("POST %s: dns operation failed", e.Path)
+	}
+	return fmt.Sprintf("POST %s: dns operation failed: %s", e.Path, e.Detail)
+}
+
 func (c *Client) postJSON(path string, body interface{}, expectedStatus int) error {
 	data, err := json.Marshal(body)
 	if err != nil {
@@ -233,6 +263,28 @@ func (c *Client) postJSON(path string, body interface{}, expectedStatus int) err
 
 	if resp.StatusCode != expectedStatus {
 		return c.readError(resp)
+	}
+
+	return checkDNSOutcome(path, resp.Body)
+}
+
+// checkDNSOutcome turns a reported DNS failure into an error so the reconcile
+// retries instead of settling on a resource whose DNS record never landed.
+// Servers older than v1.25.16 omit the field; then this is a no-op.
+func checkDNSOutcome(path string, body io.Reader) error {
+	var outcome struct {
+		DNS      string `json:"dns"`
+		DNSError string `json:"dns_error"`
+	}
+
+	// A body that is absent or not an object carries no DNS verdict — the
+	// operation status has already been established by the HTTP status code.
+	if err := json.NewDecoder(body).Decode(&outcome); err != nil {
+		return nil
+	}
+
+	if outcome.DNS == "failed" {
+		return &DNSError{Path: path, Detail: outcome.DNSError}
 	}
 	return nil
 }
