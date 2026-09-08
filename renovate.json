@@ -2,5 +2,31 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "provider/ builds against crossplane-runtime v1, which targets controller-runtime v0.19. v0.23 added Apply to client.SubResourceWriter, which crossplane-runtime's wrapperStatusClient does not implement, so anything >=0.23 fails to compile. Lift this once the provider is migrated to the Crossplane v2 APIs.",
+      "matchFileNames": ["provider/go.mod"],
+      "matchPackageNames": ["sigs.k8s.io/controller-runtime"],
+      "allowedVersions": "<0.23.0"
+    },
+    {
+      "description": "controller-runtime v0.22.x cannot compile against client-go >=0.36: v0.36 added HasSyncedChecker to cache.ResourceEventHandlerRegistration. Tied to the controller-runtime cap above.",
+      "matchFileNames": ["provider/go.mod"],
+      "matchPackageNames": [
+        "k8s.io/api",
+        "k8s.io/client-go",
+        "k8s.io/component-base",
+        "k8s.io/apiextensions-apiserver"
+      ],
+      "allowedVersions": "<0.36.0"
+    },
+    {
+      "description": "crossplane-runtime v2 is not a version bump: it moved the common API types to crossplane/apis/v2, so adopting it is a Crossplane v2 API migration. Keep major updates off the automated path.",
+      "matchFileNames": ["provider/go.mod"],
+      "matchPackageNames": ["github.com/crossplane/crossplane-runtime"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
   ]
 }

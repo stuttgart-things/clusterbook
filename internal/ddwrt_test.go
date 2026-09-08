@@ -84,6 +84,14 @@ func TestLookupDNSEntry_NotFound(t *testing.T) {
 
 // ── Unit tests: mock executor (no network) ────────────────────────────────────
 
+// mustCreateRecord fails the test if the record could not be written.
+func mustCreateRecord(t *testing.T, c *DDWRTClient, hostname, ip string) {
+	t.Helper()
+	if err := c.CreateRecord(hostname, ip); err != nil {
+		t.Fatalf("CreateRecord(%s, %s): %v", hostname, ip, err)
+	}
+}
+
 // fakeExecutor implements SSHExecutor in memory — no SSH, no network.
 type fakeExecutor struct {
 	nvram map[string]string
@@ -154,8 +162,8 @@ func TestDDWRTClient_CreateRecord_Idempotent_Mock(t *testing.T) {
 	exec := newFakeExecutor()
 	client := newDDWRTClientWithExecutor("sthings.lab", exec)
 
-	client.CreateRecord("myapp", "10.31.103.5")
-	client.CreateRecord("myapp", "10.31.103.6") // update IP
+	mustCreateRecord(t, client, "myapp", "10.31.103.5")
+	mustCreateRecord(t, client, "myapp", "10.31.103.6") // update IP
 
 	opts := exec.nvram["dnsmasq_options"]
 	count := strings.Count(opts, "/myapp.sthings.lab/")
@@ -189,9 +197,9 @@ func TestDDWRTClient_MultipleRecords_Mock(t *testing.T) {
 	exec := newFakeExecutor()
 	client := newDDWRTClientWithExecutor("sthings.lab", exec)
 
-	client.CreateRecord("app1", "10.31.103.6")
-	client.CreateRecord("app2", "10.31.103.7")
-	client.CreateRecord("app3", "10.31.103.8")
+	mustCreateRecord(t, client, "app1", "10.31.103.6")
+	mustCreateRecord(t, client, "app2", "10.31.103.7")
+	mustCreateRecord(t, client, "app3", "10.31.103.8")
 
 	opts := exec.nvram["dnsmasq_options"]
 	for _, expected := range []string{
@@ -208,7 +216,7 @@ func TestDDWRTClient_MultipleRecords_Mock(t *testing.T) {
 func TestDDWRTClient_TestDNS_Match_Mock(t *testing.T) {
 	exec := newFakeExecutor()
 	client := newDDWRTClientWithExecutor("sthings.lab", exec)
-	client.CreateRecord("myapp", "10.31.103.6")
+	mustCreateRecord(t, client, "myapp", "10.31.103.6")
 
 	fqdn, resolved, match, err := client.TestDNS("myapp", "10.31.103.6")
 	if err != nil {
@@ -225,7 +233,7 @@ func TestDDWRTClient_TestDNS_Match_Mock(t *testing.T) {
 func TestDDWRTClient_TestDNS_Mismatch_Mock(t *testing.T) {
 	exec := newFakeExecutor()
 	client := newDDWRTClientWithExecutor("sthings.lab", exec)
-	client.CreateRecord("myapp", "10.31.103.6")
+	mustCreateRecord(t, client, "myapp", "10.31.103.6")
 
 	_, resolved, match, err := client.TestDNS("myapp", "10.31.103.99")
 	if err != nil {
@@ -323,8 +331,8 @@ func TestDDWRTClient_Idempotent_FakeSSH(t *testing.T) {
 	}
 
 	// Create twice — second call should update, not duplicate
-	client.CreateRecord("myapp", "10.31.103.5")
-	client.CreateRecord("myapp", "10.31.103.6")
+	mustCreateRecord(t, client, "myapp", "10.31.103.5")
+	mustCreateRecord(t, client, "myapp", "10.31.103.6")
 
 	opts := srv.NvramGet("dnsmasq_options")
 	count := strings.Count(opts, "/myapp.sthings.lab/")
