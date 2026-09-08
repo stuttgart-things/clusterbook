@@ -9,13 +9,30 @@ import (
 	"testing"
 )
 
+// encodeJSON writes a JSON body from inside a test server handler. Handlers run
+// on their own goroutine, so failures are reported with Errorf, not Fatalf.
+func encodeJSON(t *testing.T, w http.ResponseWriter, v any) {
+	t.Helper()
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		t.Errorf("encode response: %v", err)
+	}
+}
+
+// decodeBody reads a JSON request body from inside a test server handler.
+func decodeBody(t *testing.T, r *http.Request, v any) {
+	t.Helper()
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		t.Errorf("decode request body: %v", err)
+	}
+}
+
 func TestListNetworks(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/networks" || r.Method != http.MethodGet {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]NetworkPool{
+		encodeJSON(t, w, []NetworkPool{
 			{NetworkKey: "10.31.103", Total: 3, Assigned: 1, Available: 2},
 		})
 	}))
@@ -43,7 +60,7 @@ func TestGetNetworkIPs(t *testing.T) {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]IPEntry{
+		encodeJSON(t, w, []IPEntry{
 			{IP: "10.31.103.5", Digit: "5", Status: "ASSIGNED", Cluster: "mycluster"},
 			{IP: "10.31.103.6", Digit: "6", Status: "", Cluster: ""},
 		})
@@ -82,12 +99,12 @@ func TestCreateNetwork(t *testing.T) {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
 		var req map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&req)
+		decodeBody(t, r, &req)
 		if req["network"] != "10.31.105" {
 			t.Errorf("expected network 10.31.105, got %v", req["network"])
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		encodeJSON(t, w, map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
@@ -103,7 +120,7 @@ func TestDeleteNetwork(t *testing.T) {
 		if r.Method != http.MethodDelete || r.URL.Path != "/api/v1/networks/10.31.105" {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		encodeJSON(t, w, map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
@@ -120,14 +137,14 @@ func TestAssignIP(t *testing.T) {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
 		var req map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&req)
+		decodeBody(t, r, &req)
 		if req["ip"] != "10.31.103.5" {
 			t.Errorf("expected IP 10.31.103.5, got %v", req["ip"])
 		}
 		if req["cluster"] != "mycluster" {
 			t.Errorf("expected cluster mycluster, got %v", req["cluster"])
 		}
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		encodeJSON(t, w, map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
@@ -143,7 +160,7 @@ func TestReleaseIP(t *testing.T) {
 		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/networks/10.31.103/release" {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		encodeJSON(t, w, map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
@@ -157,7 +174,7 @@ func TestReleaseIP(t *testing.T) {
 func TestFindAvailableIPs(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]IPEntry{
+		encodeJSON(t, w, []IPEntry{
 			{IP: "10.31.103.5", Digit: "5", Status: "ASSIGNED", Cluster: "mycluster"},
 			{IP: "10.31.103.6", Digit: "6", Status: "", Cluster: ""},
 			{IP: "10.31.103.7", Digit: "7", Status: "", Cluster: ""},
@@ -182,7 +199,7 @@ func TestFindAvailableIPs(t *testing.T) {
 func TestFindAvailableIPs_NotEnough(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]IPEntry{
+		encodeJSON(t, w, []IPEntry{
 			{IP: "10.31.103.5", Digit: "5", Status: "ASSIGNED", Cluster: "mycluster"},
 			{IP: "10.31.103.6", Digit: "6", Status: "", Cluster: ""},
 		})
@@ -199,7 +216,7 @@ func TestFindAvailableIPs_NotEnough(t *testing.T) {
 func TestNetworkExists(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]NetworkPool{
+		encodeJSON(t, w, []NetworkPool{
 			{NetworkKey: "10.31.103", Total: 3, Assigned: 1, Available: 2},
 		})
 	}))
@@ -233,11 +250,11 @@ func TestEditIP(t *testing.T) {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
 		var req map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&req)
+		decodeBody(t, r, &req)
 		if req["cluster"] != "newcluster" {
 			t.Errorf("expected cluster newcluster, got %v", req["cluster"])
 		}
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		encodeJSON(t, w, map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
@@ -254,7 +271,7 @@ func TestAddIPs(t *testing.T) {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		encodeJSON(t, w, map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
@@ -271,12 +288,12 @@ func TestCreateNetworkFromCIDR(t *testing.T) {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
 		var req map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&req)
+		decodeBody(t, r, &req)
 		if req["cidr"] != "10.31.103.0/24" {
 			t.Errorf("expected cidr 10.31.103.0/24, got %v", req["cidr"])
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		encodeJSON(t, w, map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
@@ -292,7 +309,7 @@ func TestCreateNetworkFromCIDR(t *testing.T) {
 // reports success for a half-completed operation.
 func TestAssignIPDNSFailure(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{
+		encodeJSON(t, w, map[string]string{
 			"status":    "ok",
 			"dns":       "failed",
 			"dns_error": "ddwrt reload dnsmasq: no working reload command",
@@ -324,7 +341,7 @@ func TestAssignIPDNSNonFailureVerdicts(t *testing.T) {
 				if verdict != "" {
 					body["dns"] = verdict
 				}
-				json.NewEncoder(w).Encode(body)
+				encodeJSON(t, w, body)
 			}))
 			defer srv.Close()
 
@@ -340,7 +357,7 @@ func TestAssignIPDNSNonFailureVerdicts(t *testing.T) {
 // that was never withdrawn must not be reported as released.
 func TestReleaseIPDNSFailure(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{
+		encodeJSON(t, w, map[string]string{
 			"status":    "ok",
 			"message":   "IP 10.31.103.5 released",
 			"dns":       "failed",
@@ -362,8 +379,8 @@ func TestRenewLease(t *testing.T) {
 		if r.URL.Path != "/api/v1/networks/10.31.103/ips/10.31.103.5/renew" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		json.NewDecoder(r.Body).Decode(&got)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		decodeBody(t, r, &got)
+		encodeJSON(t, w, map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
