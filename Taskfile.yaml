@@ -145,10 +145,16 @@ tasks:
       - protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative {{ .PROTO_DIR }}/*.proto
 
   lint:
-    desc: Lint Golang
+    desc: Lint Golang (both modules; fails the task on findings)
     cmds:
-      - cmd: golangci-lint run
-        ignore_error: true
+      - golangci-lint run
+      - task: provider-lint
+
+  provider-lint:
+    desc: Lint Crossplane provider
+    dir: provider
+    cmds:
+      - golangci-lint run
 
   dagger-lint:
     desc: Lint Golang w/ dagger
