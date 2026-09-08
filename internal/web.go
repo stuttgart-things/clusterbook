@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"sort"
@@ -33,6 +34,97 @@ type IPEntry struct {
 	Cluster        string `json:"cluster"`
 	FQDN           string `json:"fqdn,omitempty"`
 	LeaseExpiresAt int64  `json:"lease_expires_at,omitempty"`
+}
+
+// dnsResult records the outcome of the DNS half of an IP operation.
+//
+// Both providers log their own failures, but before issue #187 every call site
+// discarded the returned error, so the HTTP response looked identical whether
+// the record was written or not. Handlers now thread a dnsResult through and
+// report it, giving an automated caller something to react to.
+type dnsResult struct {
+	attempted bool
+	errs      []string
+}
+
+// add records a provider error; nil errors (including the no-op returned by a
+// disabled provider) are ignored.
+func (r *dnsResult) add(err error) {
+	if err != nil {
+		r.errs = append(r.errs, err.Error())
+	}
+}
+
+// create writes the record on every enabled provider, collecting failures.
+func (r *dnsResult) create(pdns *PDNSClient, ddwrt *DDWRTClient, cluster, ip string) {
+	r.attempted = true
+	r.add(pdns.CreateRecord(cluster, ip)) // nil-receiver safe
+	if ddwrt != nil {
+		r.add(ddwrt.CreateRecord(cluster, ip))
+	}
+}
+
+// remove deletes the record on every enabled provider, collecting failures.
+func (r *dnsResult) remove(pdns *PDNSClient, ddwrt *DDWRTClient, cluster string) {
+	r.attempted = true
+	r.add(pdns.DeleteRecord(cluster)) // nil-receiver safe
+	if ddwrt != nil {
+		r.add(ddwrt.DeleteRecord(cluster))
+	}
+}
+
+func (r dnsResult) failed() bool { return len(r.errs) > 0 }
+
+// status is "skipped" when no DNS work was requested, "failed" when any
+// provider errored, "ok" otherwise.
+func (r dnsResult) status() string {
+	switch {
+	case !r.attempted:
+		return "skipped"
+	case r.failed():
+		return "failed"
+	default:
+		return "ok"
+	}
+}
+
+// message joins every provider error into one line.
+func (r dnsResult) message() string { return strings.Join(r.errs, "; ") }
+
+// annotate adds the DNS outcome to a JSON response body. The IP operation
+// itself has already been persisted, so the status code stays 200 and the
+// caller inspects "dns" to learn whether the DNS half went through.
+func (r dnsResult) annotate(resp map[string]any) map[string]any {
+	resp["dns"] = r.status()
+	if r.failed() {
+		resp["dns_error"] = r.message()
+	}
+	return resp
+}
+
+// banner renders an HTMX-visible warning, or "" when nothing failed. It is
+// written ahead of the re-rendered table so the UI shows the same failure the
+// REST API reports.
+func (r dnsResult) banner() string {
+	if !r.failed() {
+		return ""
+	}
+	return `<div style="background:#4c1d1d;border:1px solid #b91c1c;color:#fecaca;padding:0.5rem 0.75rem;border-radius:4px;margin-bottom:0.75rem;font-size:0.8rem;">` +
+		`<strong>DNS operation failed.</strong> The IP entry was saved, but the DNS record was not. ` +
+		template.HTMLEscapeString(r.message()) + `</div>`
+}
+
+// withDNSSuffix marks a status as DNS-backed without doubling the marker when
+// the caller already supplied one (issue #187: "ASSIGNED:DNS" became
+// "ASSIGNED:DNS:DNS").
+func withDNSSuffix(status string) string {
+	return strings.TrimSuffix(status, ":DNS") + ":DNS"
+}
+
+// wantsDNS reports whether DNS records were requested, either through the
+// create_dns flag or through a status that already carries the ":DNS" marker.
+func wantsDNS(createDNS bool, status string) bool {
+	return createDNS || strings.HasSuffix(status, ":DNS")
 }
 
 // dnsZone returns the configured DNS zone (without trailing dot) from PDNS or DDWRT.
@@ -211,6 +303,34 @@ func getIPEntries(ips IPs, networkKey string) []IPEntry {
 	return entries
 }
 
+// writeJSON writes a JSON response body with the correct content type.
+func writeJSON(w http.ResponseWriter, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		log.Printf("encode response: %v", err)
+	}
+}
+
+// renderIPTable re-renders the IP table for an HTMX swap, prefixed with a
+// warning banner when the DNS half of the operation failed — the UI counterpart
+// of the "dns" field in the REST responses.
+func renderIPTable(w http.ResponseWriter, networkKey string, entries []IPEntry, dns dnsResult) {
+	if banner := dns.banner(); banner != "" {
+		if _, err := io.WriteString(w, banner); err != nil {
+			log.Printf("write dns banner: %v", err)
+			return
+		}
+	}
+
+	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
+	if err := tmpl.Execute(w, struct {
+		NetworkKey string
+		Entries    []IPEntry
+	}{networkKey, entries}); err != nil {
+		log.Printf("render ip table: %v", err)
+	}
+}
+
 // --- HTMX Frontend Handlers ---
 
 type dashboardData struct {
@@ -302,31 +422,27 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		return
 	}
 
+	createDNS = wantsDNS(createDNS, status)
+
 	entry := ipList[ipKey][ipDigit]
 	entry.Status = status
 	if createDNS {
-		entry.Status = status + ":DNS"
+		entry.Status = withDNSSuffix(status)
 	}
 	entry.Cluster = cluster
 	ipList[ipKey][ipDigit] = entry
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
+	var dns dnsResult
 	if createDNS {
-		pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
-		if ddwrt != nil {
-			ddwrt.CreateRecord(cluster, ipKey+"."+ipDigit)
-		}
+		dns.create(pdns, ddwrt, cluster, ipKey+"."+ipDigit)
 	}
 
 	// Re-render the network detail table
 	ips := ipList[networkKey]
 	entries := getIPEntries(ips, networkKey)
-	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
-	tmpl.Execute(w, struct {
-		NetworkKey string
-		Entries    []IPEntry
-	}{networkKey, entries})
+	renderIPTable(w, networkKey, entries, dns)
 }
 
 func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
@@ -364,21 +480,15 @@ func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configL
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
+	var dns dnsResult
 	if hadDNS {
-		pdns.DeleteRecord(prevCluster)
-		if ddwrt != nil {
-			ddwrt.DeleteRecord(prevCluster)
-		}
+		dns.remove(pdns, ddwrt, prevCluster)
 	}
 
 	// Re-render the network detail table
 	ips := ipList[networkKey]
 	entries := getIPEntries(ips, networkKey)
-	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
-	tmpl.Execute(w, struct {
-		NetworkKey string
-		Entries    []IPEntry
-	}{networkKey, entries})
+	renderIPTable(w, networkKey, entries, dns)
 }
 
 // --- REST API Handlers ---
@@ -465,10 +575,12 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		return
 	}
 
+	req.CreateDNS = wantsDNS(req.CreateDNS, req.Status)
+
 	entry := ipList[networkKey][ipDigit]
 	entry.Status = req.Status
 	if req.CreateDNS {
-		entry.Status = req.Status + ":DNS"
+		entry.Status = withDNSSuffix(req.Status)
 	}
 	entry.Cluster = req.Cluster
 	if req.LeaseDurationSeconds > 0 {
@@ -480,18 +592,15 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
+	var dns dnsResult
 	if req.CreateDNS {
-		pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
-		if ddwrt != nil {
-			ddwrt.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
-		}
+		dns.create(pdns, ddwrt, req.Cluster, networkKey+"."+ipDigit)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, dns.annotate(map[string]any{
 		"status":  "ok",
 		"message": fmt.Sprintf("IP %s assigned to cluster %s", req.IP, req.Cluster),
-	})
+	}))
 }
 
 // handleAPIReserve finds an available IP in the network, assigns it to the cluster, and returns the full IP.
@@ -552,10 +661,12 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	fullIP := networkKey + "." + foundDigit
 
 	// Assign the IP
+	req.CreateDNS = wantsDNS(req.CreateDNS, req.Status)
+
 	entry := networkIPs[foundDigit]
 	entry.Status = req.Status
 	if req.CreateDNS {
-		entry.Status = req.Status + ":DNS"
+		entry.Status = withDNSSuffix(req.Status)
 	}
 	entry.Cluster = req.Cluster
 	if req.LeaseDurationSeconds > 0 {
@@ -567,21 +678,18 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
+	var dns dnsResult
 	if req.CreateDNS {
-		pdns.CreateRecord(req.Cluster, fullIP)
-		if ddwrt != nil {
-			ddwrt.CreateRecord(req.Cluster, fullIP)
-		}
+		dns.create(pdns, ddwrt, req.Cluster, fullIP)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, dns.annotate(map[string]any{
 		"ip":      fullIP,
 		"ips":     []string{fullIP},
 		"digit":   foundDigit,
 		"status":  entry.Status,
 		"cluster": req.Cluster,
-	})
+	}))
 }
 
 func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
@@ -622,18 +730,15 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
+	var dns dnsResult
 	if hadDNS {
-		pdns.DeleteRecord(prevCluster)
-		if ddwrt != nil {
-			ddwrt.DeleteRecord(prevCluster)
-		}
+		dns.remove(pdns, ddwrt, prevCluster)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, dns.annotate(map[string]any{
 		"status":  "ok",
 		"message": fmt.Sprintf("IP %s released", req.IP),
-	})
+	}))
 }
 
 func handleAPIRenewLease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
@@ -932,18 +1037,15 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	delete(ipList[networkKey], ip)
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
+	var dns dnsResult
 	if hadDNS {
-		pdns.DeleteRecord(prevCluster)
-		if ddwrt != nil {
-			ddwrt.DeleteRecord(prevCluster)
-		}
+		dns.remove(pdns, ddwrt, prevCluster)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, dns.annotate(map[string]any{
 		"status":  "ok",
 		"message": fmt.Sprintf("IP %s.%s deleted", networkKey, ip),
-	})
+	}))
 }
 
 func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
@@ -996,10 +1098,12 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	prevCluster := entry.Cluster
 	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
 
+	req.CreateDNS = wantsDNS(req.CreateDNS, req.Status)
+
 	baseStatus := strings.TrimSuffix(req.Status, ":DNS")
 	entry.Status = baseStatus
 	if req.CreateDNS {
-		entry.Status = baseStatus + ":DNS"
+		entry.Status = withDNSSuffix(baseStatus)
 	}
 	entry.Cluster = req.Cluster
 	ipList[networkKey][ipDigit] = entry
@@ -1009,24 +1113,18 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	// Handle DNS changes. Remove the old record when DNS is turned off or the
 	// cluster changed. When DNS is on, always (re)create — both providers are
 	// idempotent, so re-saving reconciles a record that drifted from the router.
+	var dns dnsResult
 	if hadDNS && (!req.CreateDNS || prevCluster != req.Cluster) {
-		pdns.DeleteRecord(prevCluster)
-		if ddwrt != nil {
-			ddwrt.DeleteRecord(prevCluster)
-		}
+		dns.remove(pdns, ddwrt, prevCluster)
 	}
 	if req.CreateDNS {
-		pdns.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
-		if ddwrt != nil {
-			ddwrt.CreateRecord(req.Cluster, networkKey+"."+ipDigit)
-		}
+		dns.create(pdns, ddwrt, req.Cluster, networkKey+"."+ipDigit)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, dns.annotate(map[string]any{
 		"status":  "ok",
 		"message": fmt.Sprintf("IP %s.%s updated: cluster=%s status=%s", networkKey, ipDigit, req.Cluster, entry.Status),
-	})
+	}))
 }
 
 // --- Cluster Info Handlers ---
@@ -1269,20 +1367,14 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 	delete(ipList[networkKey], ipDigit)
 	saveConfig(ipList, loadFrom, configLoc, configNm)
 
+	var dns dnsResult
 	if hadDNS {
-		pdns.DeleteRecord(prevCluster)
-		if ddwrt != nil {
-			ddwrt.DeleteRecord(prevCluster)
-		}
+		dns.remove(pdns, ddwrt, prevCluster)
 	}
 
 	// Re-render the IP table
 	entries := getIPEntries(ipList[networkKey], networkKey)
-	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
-	tmpl.Execute(w, struct {
-		NetworkKey string
-		Entries    []IPEntry
-	}{networkKey, entries})
+	renderIPTable(w, networkKey, entries, dns)
 }
 
 func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
@@ -1324,9 +1416,11 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	hadDNS := strings.HasSuffix(entry.Status, ":DNS")
 
 	// Update entry
+	createDNS = wantsDNS(createDNS, status)
+
 	entry.Status = status
 	if createDNS {
-		entry.Status = status + ":DNS"
+		entry.Status = withDNSSuffix(status)
 	}
 	entry.Cluster = cluster
 	ipList[ipKey][ipDigit] = entry
@@ -1336,27 +1430,18 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	// Handle DNS changes. Remove the old record when DNS is turned off or the
 	// cluster changed. When DNS is on, always (re)create — both providers are
 	// idempotent, so re-saving reconciles a record that drifted from the router.
+	var dns dnsResult
 	if hadDNS && (!createDNS || prevCluster != cluster) {
-		pdns.DeleteRecord(prevCluster)
-		if ddwrt != nil {
-			ddwrt.DeleteRecord(prevCluster)
-		}
+		dns.remove(pdns, ddwrt, prevCluster)
 	}
 	if createDNS {
-		pdns.CreateRecord(cluster, ipKey+"."+ipDigit)
-		if ddwrt != nil {
-			ddwrt.CreateRecord(cluster, ipKey+"."+ipDigit)
-		}
+		dns.create(pdns, ddwrt, cluster, ipKey+"."+ipDigit)
 	}
 
 	// Re-render the network detail table
 	ips := ipList[networkKey]
 	entries := getIPEntries(ips, networkKey)
-	tmpl := template.Must(template.New("table").Funcs(TemplateFuncs()).Parse(ipTablePartial))
-	tmpl.Execute(w, struct {
-		NetworkKey string
-		Entries    []IPEntry
-	}{networkKey, entries})
+	renderIPTable(w, networkKey, entries, dns)
 }
 
 func handleHTMXTestDNS(w http.ResponseWriter, r *http.Request, pdns *PDNSClient, ddwrt *DDWRTClient) {

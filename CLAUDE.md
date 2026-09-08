@@ -122,15 +122,22 @@ go internal.StartWebServer(httpPort, loadConfigFrom, configLocation, configName,
 
 Both return `nil` when disabled — handlers must nil-check before calling.
 
+Both `CreateRecord` and `DeleteRecord` return an `error`. **Never discard it** —
+that was issue #187: the API answered 200 while the record was never written.
+Handlers thread a `dnsResult` through and report the outcome:
+
 ```go
 // internal/web.go — assign handler pattern
-if pdns != nil {
-    pdns.CreateRecord(hostname, ip)
+var dns dnsResult
+if createDNS {
+    dns.create(pdns, ddwrt, cluster, ip)  // collects errors from both providers
 }
-if ddwrt != nil {
-    ddwrt.CreateRecord(hostname, ip)
-}
+
+writeJSON(w, dns.annotate(map[string]any{...}))  // adds "dns" + "dns_error"
 ```
+
+`dnsResult.create`/`remove` are nil-safe for disabled providers. HTMX handlers
+call `renderIPTable(w, key, entries, dns)`, which prepends a failure banner.
 
 Triggered by REST assign with `"create_dns": true`:
 
@@ -152,9 +159,30 @@ SSHes into DD-WRT router and manages `dnsmasq_options` via `nvram`:
 # Read current entries
 nvram get dnsmasq_options
 
-# Write new entry (preserves others, deduplicates by FQDN)
-nvram set dnsmasq_options='address=/myapp.sthings.lab/10.31.103.6' && nvram commit && restart_dnsmasq
+# Write new entry (preserves others, deduplicates by FQDN) — each step is a
+# SEPARATE SSH command so a failure names the step that failed
+nvram set dnsmasq_options='address=/myapp.sthings.lab/10.31.103.6'
+nvram commit
+restart_dnsmasq            # falls back if this exits 127 (see below)
 ```
+
+### dnsmasq reload fallback
+
+`restart_dnsmasq` is a DD-WRT shell *function*, not a binary, so a
+non-interactive SSH session may not resolve it and exits 127. `reloadDnsmasq`
+tries each of `dnsmasqReloadCommands` in order and stops at the first that
+exits zero:
+
+1. `restart_dnsmasq`
+2. `stopservice dnsmasq && startservice dnsmasq`
+3. `killall -HUP dnsmasq`
+
+If none works, the error says so *and* states that NVRAM was already committed —
+the router is then split between what NVRAM holds and what dnsmasq serves.
+
+**Never chain the three write steps with `&&` again.** That was the bug in
+issue #187: one exit 127 named none of them, while `set` and `commit` had
+already run.
 
 ### Key files
 
@@ -182,7 +210,7 @@ Tests inject `fakeExecutor` (in-memory) or connect to `FakeDDWRTServer` (real SS
 2. Implement `CreateRecord(hostname, ip string) error` and `DeleteRecord(hostname string) error`
 3. Add env vars to `main.go` var block
 4. Init client in `main()` and pass to `StartWebServer`
-5. Nil-check and call in assign/release handlers in `web.go`
+5. Call via `dnsResult.create`/`remove` in the assign/release handlers in `web.go` — never discard the error
 6. Add tests in `internal/<provider>_test.go`
 
 ---
@@ -267,6 +295,8 @@ grpcurl -plaintext localhost:50051 ipservice.IpService/GetIpAddressRange \
 - Errors: wrap with context using `fmt.Errorf("ddwrt <operation>: %w", err)`
 - Env vars: `SCREAMING_SNAKE_CASE`, read only in `main.go` var block, passed as constructor args
 - Constructor returns `nil` when disabled — callers always nil-check
+- DNS provider methods return `error`; every call site must report it, never drop it (issue #187)
+- The `:DNS` status marker is applied via `withDNSSuffix` — never `status + ":DNS"`, which doubles it
 - Pure helper functions (no I/O) in same file as provider, named without receiver — keeps them unit-testable
 - Test file naming: `<provider>_test.go` in same package (`package internal`)
 - No `init()` functions
@@ -330,7 +360,8 @@ Image is also scanned with Trivy after build.
 ## KNOWN PATTERNS TO FOLLOW
 
 - **Nil-safe providers**: `if pdns != nil { ... }` — never assume enabled
-- **Compound SSH commands**: `cmd1 && cmd2 && cmd3` — DD-WRT needs all three: `set`, `commit`, `restart_dnsmasq`
+- **Separate SSH commands**: run `set`, `commit` and the reload as individual commands — never one `&&` chain, so a failure names the failing step (issue #187)
+- **Reload fallback**: try every entry of `dnsmasqReloadCommands`; report NVRAM as committed when all fail
 - **FQDN deduplication**: always call `mergeDNSEntry` before writing — idempotent by FQDN
 - **Test hierarchy**: pure helpers -> mock executor -> fake SSH server — add tests at all three levels for new SSH behaviour
 - **Env naming**: mirror pdns pattern exactly: `DDWRT_ENABLED`, `DDWRT_HOST`, `DDWRT_PASSWORD`, `DDWRT_ZONE`

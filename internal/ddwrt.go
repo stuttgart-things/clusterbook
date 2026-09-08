@@ -82,10 +82,8 @@ func (d *DDWRTClient) CreateRecord(hostname, ip string) (err error) {
 	}
 
 	updated := mergeDNSEntry(existing, newEntry, fqdn)
-	setCmd := fmt.Sprintf("nvram set dnsmasq_options='%s' && nvram commit && restart_dnsmasq", updated)
-
-	if _, err := exec.Run(setCmd); err != nil {
-		return fmt.Errorf("ddwrt write dnsmasq_options: %w", err)
+	if err := d.writeDNSOptions(exec, updated); err != nil {
+		return err
 	}
 
 	d.logger.Info("DDWRT DNS RECORD CREATED", d.logger.Args("entry", newEntry))
@@ -115,10 +113,8 @@ func (d *DDWRTClient) DeleteRecord(hostname string) (err error) {
 	}
 
 	updated := removeDNSEntry(existing, fqdn)
-	setCmd := fmt.Sprintf("nvram set dnsmasq_options='%s' && nvram commit && restart_dnsmasq", updated)
-
-	if _, err := exec.Run(setCmd); err != nil {
-		return fmt.Errorf("ddwrt write dnsmasq_options: %w", err)
+	if err := d.writeDNSOptions(exec, updated); err != nil {
+		return err
 	}
 
 	d.logger.Info("DDWRT DNS RECORD DELETED", d.logger.Args("fqdn", fqdn))
@@ -154,6 +150,59 @@ func (d *DDWRTClient) TestDNS(cluster, expectedIP string) (string, string, bool,
 	}
 
 	return fqdn, resolved, resolved == expectedIP, nil
+}
+
+// dnsmasqReloadCommands are tried in order until one succeeds. restart_dnsmasq
+// is a DD-WRT shell function rather than a binary, so a non-interactive SSH
+// session may not resolve it and exits 127 even though the same word works when
+// typed at a shell. The service and signal variants are real binaries and work
+// where it does not.
+var dnsmasqReloadCommands = []string{
+	"restart_dnsmasq",
+	"stopservice dnsmasq && startservice dnsmasq",
+	"killall -HUP dnsmasq",
+}
+
+// writeDNSOptions persists dnsmasq_options and reloads dnsmasq.
+//
+// Each step runs as its own SSH command instead of the previous
+// `set && commit && restart_dnsmasq` chain: that chain reported a single exit
+// 127 that named none of the three, while already having committed NVRAM — so
+// the router was left with new NVRAM and a stale running dnsmasq, and nothing
+// outside it could tell. Now the returned error names the step that failed, and
+// a reload failure says explicitly that NVRAM was committed.
+func (d *DDWRTClient) writeDNSOptions(exec SSHExecutor, updated string) error {
+	if _, err := exec.Run(fmt.Sprintf("nvram set dnsmasq_options='%s'", updated)); err != nil {
+		return fmt.Errorf("ddwrt nvram set dnsmasq_options: %w", err)
+	}
+
+	if _, err := exec.Run("nvram commit"); err != nil {
+		return fmt.Errorf("ddwrt nvram commit: %w", err)
+	}
+
+	if err := d.reloadDnsmasq(exec); err != nil {
+		return fmt.Errorf("ddwrt reload dnsmasq (nvram committed, running dnsmasq still serving old records): %w", err)
+	}
+
+	return nil
+}
+
+// reloadDnsmasq tries each reload command in turn and returns nil on the first
+// one that exits zero. It reports every attempt when all of them fail, so the
+// log names what was tried rather than a bare exit status.
+func (d *DDWRTClient) reloadDnsmasq(exec SSHExecutor) error {
+	attempts := make([]string, 0, len(dnsmasqReloadCommands))
+
+	for _, cmd := range dnsmasqReloadCommands {
+		if _, err := exec.Run(cmd); err == nil {
+			d.logger.Debug("DDWRT DNSMASQ RELOADED", d.logger.Args("cmd", cmd))
+			return nil
+		} else {
+			attempts = append(attempts, fmt.Sprintf("%s: %v", cmd, err))
+		}
+	}
+
+	return fmt.Errorf("no working reload command: %s", strings.Join(attempts, "; "))
 }
 
 // getExecutor returns injected executor (tests) or a fresh real SSH executor.

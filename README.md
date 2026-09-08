@@ -199,6 +199,33 @@ curl -X POST http://localhost:8080/api/v1/networks/10.31.103/assign \
   -d '{"ip": "10.31.103.6", "cluster": "my-cluster", "status": "ASSIGNED", "create_dns": true}'
 ```
 
+### The `dns` field in responses
+
+Every endpoint that touches DNS (`/assign`, `/reserve`, `/release`, `/ips/{ip}` edit
+and delete) reports what happened to the record:
+
+| `dns` | Meaning |
+|-----------|-------------------------------------------------------------|
+| `ok` | The record was written or withdrawn on every enabled provider |
+| `failed` | At least one provider failed — `dns_error` carries the detail |
+| `skipped` | No DNS work was requested |
+
+The IP operation itself is persisted either way, so the status code stays `200`
+and the DNS verdict lives in the body. An automated caller should check it:
+
+```json
+{
+  "ip": "10.31.103.6",
+  "cluster": "my-cluster",
+  "status": "ASSIGNED:DNS",
+  "dns": "failed",
+  "dns_error": "ddwrt reload dnsmasq (nvram committed, running dnsmasq still serving old records): ..."
+}
+```
+
+A status ending in `:DNS` is equivalent to passing `create_dns: true`, and the
+marker is never appended twice.
+
 </details>
 
 <details><summary>gRPC</summary>
@@ -229,6 +256,10 @@ dagger call create-network-from-cidr --server="localhost:8080" --cidr="10.31.105
 # Assign IP with DNS
 dagger call assign-ip --server="localhost:8080" --network-key="10.31.103" \
   --ip="10.31.103.6" --cluster="my-cluster" --status="ASSIGNED" --create-dns
+
+# Reserve the next free IP with DNS (idempotent -- safe to re-run)
+dagger call reserve-ip --server="localhost:8080" --network-key="10.31.103" \
+  --cluster="my-cluster" --create-dns
 
 # Release IP
 dagger call release-ip --server="localhost:8080" --network-key="10.31.103" --ip="10.31.103.6"
@@ -332,6 +363,9 @@ EOF
 ## DNS PROVIDERS
 
 Both DNS providers are optional and can run simultaneously. Enable them via env vars. Records are created/deleted when `create_dns: true` is passed during assign/release.
+
+A provider failure never fails the IP operation silently — the response carries a
+[`dns` field](#the-dns-field-in-responses) stating whether the record actually landed.
 
 <details><summary>POWERDNS</summary>
 

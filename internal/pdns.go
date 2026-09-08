@@ -72,10 +72,12 @@ type rrsetPayload struct {
 	RRSets []rrset `json:"rrsets"`
 }
 
-// CreateRecord creates a wildcard A record: *.{cluster}.{zone} → ip
-func (c *PDNSClient) CreateRecord(cluster, ip string) {
+// CreateRecord creates a wildcard A record: *.{cluster}.{zone} → ip.
+// Returns nil when the client is disabled (nil receiver) or cluster is empty,
+// so callers can treat "not configured" as a no-op rather than a failure.
+func (c *PDNSClient) CreateRecord(cluster, ip string) error {
 	if c == nil || cluster == "" {
-		return
+		return nil
 	}
 
 	fqdn := fmt.Sprintf("*.%s.%s", cluster, c.Zone)
@@ -93,13 +95,14 @@ func (c *PDNSClient) CreateRecord(cluster, ip string) {
 		},
 	}
 
-	c.patchZone(payload, "CREATE", fqdn, ip)
+	return c.patchZone(payload, "CREATE", fqdn, ip)
 }
 
-// DeleteRecord deletes the wildcard A record for a cluster
-func (c *PDNSClient) DeleteRecord(cluster string) {
+// DeleteRecord deletes the wildcard A record for a cluster.
+// Returns nil when the client is disabled (nil receiver) or cluster is empty.
+func (c *PDNSClient) DeleteRecord(cluster string) error {
 	if c == nil || cluster == "" {
-		return
+		return nil
 	}
 
 	fqdn := fmt.Sprintf("*.%s.%s", cluster, c.Zone)
@@ -114,7 +117,7 @@ func (c *PDNSClient) DeleteRecord(cluster string) {
 		},
 	}
 
-	c.patchZone(payload, "DELETE", fqdn, "")
+	return c.patchZone(payload, "DELETE", fqdn, "")
 }
 
 // TestDNS resolves test.{cluster}.{zone} and checks if it matches the expected IP.
@@ -142,19 +145,20 @@ func (c *PDNSClient) TestDNS(cluster, expectedIP string) (string, string, bool, 
 	return fqdn, strings.Join(ips, ","), false, nil
 }
 
-// patchZone sends the PATCH request to PowerDNS
-func (c *PDNSClient) patchZone(payload rrsetPayload, action, fqdn, ip string) {
+// patchZone sends the PATCH request to PowerDNS. Failures are logged here (so
+// they are never silent) *and* returned, so handlers can report the outcome.
+func (c *PDNSClient) patchZone(payload rrsetPayload, action, fqdn, ip string) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("PDNS %s ERROR (marshal): %v", action, err)
-		return
+		return fmt.Errorf("pdns %s marshal: %w", action, err)
 	}
 
 	url := fmt.Sprintf("%s/api/v1/servers/localhost/zones/%s", c.URL, c.Zone)
 	req, err := http.NewRequest(http.MethodPatch, url, bytes.NewReader(body))
 	if err != nil {
 		log.Printf("PDNS %s ERROR (request): %v", action, err)
-		return
+		return fmt.Errorf("pdns %s request: %w", action, err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -163,13 +167,13 @@ func (c *PDNSClient) patchZone(payload rrsetPayload, action, fqdn, ip string) {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		log.Printf("PDNS %s ERROR (http): %v", action, err)
-		return
+		return fmt.Errorf("pdns %s http: %w", action, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
 		log.Printf("PDNS %s FAILED: %s → HTTP %d", action, fqdn, resp.StatusCode)
-		return
+		return fmt.Errorf("pdns %s %s: HTTP %d", action, fqdn, resp.StatusCode)
 	}
 
 	if ip != "" {
@@ -177,4 +181,5 @@ func (c *PDNSClient) patchZone(payload rrsetPayload, action, fqdn, ip string) {
 	} else {
 		log.Printf("PDNS %s OK: %s", action, fqdn)
 	}
+	return nil
 }

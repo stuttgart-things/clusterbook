@@ -557,3 +557,274 @@ func TestDnsZone(t *testing.T) {
 		}
 	})
 }
+
+// ── Issue #187: the DNS outcome must reach the caller ────────────────────────
+
+// failingDDWRT returns a client whose every reload command exits 127, i.e. the
+// router from issue #187.
+func failingDDWRT() *DDWRTClient {
+	return newDDWRTClientWithExecutor("sthings.lab", newFakeExecutor(
+		"restart_dnsmasq",
+		"stopservice dnsmasq && startservice dnsmasq",
+		"killall -HUP dnsmasq",
+	))
+}
+
+// workingDDWRT returns a client backed by a router where everything works.
+func workingDDWRT() *DDWRTClient {
+	return newDDWRTClientWithExecutor("sthings.lab", newFakeExecutor())
+}
+
+func decodeJSON(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
+	t.Helper()
+	var body map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	return body
+}
+
+func TestHandleAPIReserve_ReportsDNSFailure(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/reserve",
+		strings.NewReader(`{"cluster":"dnstest-probe","create_dns":true}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	handleAPIReserve(w, req, "disk", dir, name, nil, failingDDWRT())
+
+	// The reservation itself succeeded and is persisted, so the status stays 200.
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	body := decodeJSON(t, w)
+	if body["dns"] != "failed" {
+		t.Errorf(`expected "dns":"failed", got %v`, body["dns"])
+	}
+	if detail, _ := body["dns_error"].(string); detail == "" {
+		t.Error("expected dns_error to carry the provider failure")
+	}
+	if body["ip"] == nil {
+		t.Error("the reserved IP must still be reported")
+	}
+}
+
+func TestHandleAPIReserve_ReportsDNSSuccess(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/reserve",
+		strings.NewReader(`{"cluster":"probe","create_dns":true}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	handleAPIReserve(w, req, "disk", dir, name, nil, workingDDWRT())
+
+	body := decodeJSON(t, w)
+	if body["dns"] != "ok" {
+		t.Errorf(`expected "dns":"ok", got %v`, body["dns"])
+	}
+	if _, present := body["dns_error"]; present {
+		t.Errorf("dns_error must be absent on success, got %v", body["dns_error"])
+	}
+}
+
+func TestHandleAPIAssign_ReportsDNSSkippedWhenNotRequested(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/assign",
+		strings.NewReader(`{"ip":"10.31.103.7","cluster":"probe","status":"ASSIGNED"}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	handleAPIAssign(w, req, "disk", dir, name, nil, failingDDWRT())
+
+	body := decodeJSON(t, w)
+	if body["dns"] != "skipped" {
+		t.Errorf(`expected "dns":"skipped", got %v`, body["dns"])
+	}
+}
+
+func TestHandleAPIAssign_ReportsDNSFailure(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/assign",
+		strings.NewReader(`{"ip":"10.31.103.7","cluster":"probe","create_dns":true}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	handleAPIAssign(w, req, "disk", dir, name, nil, failingDDWRT())
+
+	if body := decodeJSON(t, w); body["dns"] != "failed" {
+		t.Errorf(`expected "dns":"failed", got %v`, body["dns"])
+	}
+}
+
+// TestHandleAPIRelease_ReportsDNSFailure is the case that misled the operator:
+// "IP released" while the record was still being served.
+func TestHandleAPIRelease_ReportsDNSFailure(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/release",
+		strings.NewReader(`{"ip":"10.31.103.5"}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	// .5 carries status ASSIGNED:DNS, so a DNS delete is attempted.
+	handleAPIRelease(w, req, "disk", dir, name, nil, failingDDWRT())
+
+	body := decodeJSON(t, w)
+	if body["dns"] != "failed" {
+		t.Errorf(`expected "dns":"failed", got %v`, body["dns"])
+	}
+	if body["message"] == nil {
+		t.Error("the release message must still be reported")
+	}
+}
+
+// ── Issue #187 (3): the ":DNS" marker must not double ────────────────────────
+
+func TestWithDNSSuffix(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"ASSIGNED", "ASSIGNED:DNS"},
+		{"ASSIGNED:DNS", "ASSIGNED:DNS"},
+		{"PENDING", "PENDING:DNS"},
+		{"PENDING:DNS", "PENDING:DNS"},
+	}
+	for _, tt := range tests {
+		if got := withDNSSuffix(tt.in); got != tt.want {
+			t.Errorf("withDNSSuffix(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestWantsDNS(t *testing.T) {
+	if !wantsDNS(true, "ASSIGNED") {
+		t.Error("the create_dns flag alone must request DNS")
+	}
+	if !wantsDNS(false, "ASSIGNED:DNS") {
+		t.Error("a status already carrying the marker must request DNS")
+	}
+	if wantsDNS(false, "ASSIGNED") {
+		t.Error("neither flag nor marker must not request DNS")
+	}
+}
+
+func TestHandleAPIReserve_StatusMarkerDoesNotDouble(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/reserve",
+		strings.NewReader(`{"cluster":"dnstest-probe","status":"ASSIGNED:DNS","create_dns":true}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	handleAPIReserve(w, req, "disk", dir, name, nil, workingDDWRT())
+
+	if got := decodeJSON(t, w)["status"]; got != "ASSIGNED:DNS" {
+		t.Errorf(`expected status "ASSIGNED:DNS", got %v`, got)
+	}
+}
+
+func TestHandleAPIAssign_StatusMarkerDoesNotDouble(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/assign",
+		strings.NewReader(`{"ip":"10.31.103.7","cluster":"probe","status":"ASSIGNED:DNS","create_dns":true}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	handleAPIAssign(w, req, "disk", dir, name, nil, workingDDWRT())
+
+	ipList, err := LoadProfile("disk", dir, name)
+	if err != nil {
+		t.Fatalf("reload config: %v", err)
+	}
+	if got := ipList["10.31.103"]["7"].Status; got != "ASSIGNED:DNS" {
+		t.Errorf(`expected persisted status "ASSIGNED:DNS", got %q`, got)
+	}
+}
+
+// TestHandleAPIAssign_StatusMarkerImpliesDNS: a status that claims a DNS record
+// must actually get one, rather than only being labelled as if it had.
+func TestHandleAPIAssign_StatusMarkerImpliesDNS(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/assign",
+		strings.NewReader(`{"ip":"10.31.103.7","cluster":"probe","status":"ASSIGNED:DNS"}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+
+	exec := newFakeExecutor()
+	handleAPIAssign(w, req, "disk", dir, name, nil, newDDWRTClientWithExecutor("sthings.lab", exec))
+
+	if got := decodeJSON(t, w)["dns"]; got != "ok" {
+		t.Errorf(`expected "dns":"ok", got %v`, got)
+	}
+	if exec.nvram["dnsmasq_options"] != "address=/probe.sthings.lab/10.31.103.7" {
+		t.Errorf("expected the record to be written, got %q", exec.nvram["dnsmasq_options"])
+	}
+}
+
+// ── The HTMX UI reports the same failure ─────────────────────────────────────
+
+func TestHandleHTMXAssign_ShowsDNSFailureBanner(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	form := strings.NewReader("ip=10.31.103.7&cluster=probe&status=ASSIGNED&network_key=10.31.103&create_dns=on")
+	req := httptest.NewRequest("POST", "/htmx/assign", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+
+	handleHTMXAssign(w, req, "disk", dir, name, nil, failingDDWRT())
+
+	body := w.Body.String()
+	if !strings.Contains(body, "DNS operation failed") {
+		t.Error("expected a DNS failure banner in the HTMX response")
+	}
+	if !strings.Contains(body, "<table>") {
+		t.Error("the table must still be rendered alongside the banner")
+	}
+}
+
+func TestHandleHTMXAssign_NoBannerOnSuccess(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	form := strings.NewReader("ip=10.31.103.7&cluster=probe&status=ASSIGNED&network_key=10.31.103&create_dns=on")
+	req := httptest.NewRequest("POST", "/htmx/assign", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+
+	handleHTMXAssign(w, req, "disk", dir, name, nil, workingDDWRT())
+
+	if strings.Contains(w.Body.String(), "DNS operation failed") {
+		t.Error("no banner expected when DNS succeeded")
+	}
+}
+
+// ── dnsResult ────────────────────────────────────────────────────────────────
+
+func TestDNSResult_NilProvidersAreNotFailures(t *testing.T) {
+	var dns dnsResult
+	dns.create(nil, nil, "probe", "10.31.103.7")
+
+	if dns.failed() {
+		t.Errorf("disabled providers must not count as a failure: %v", dns.errs)
+	}
+	if dns.status() != "ok" {
+		t.Errorf(`expected "ok", got %q`, dns.status())
+	}
+}
+
+func TestDNSResult_AnnotateOmitsErrorOnSuccess(t *testing.T) {
+	var dns dnsResult
+	dns.attempted = true
+
+	body := dns.annotate(map[string]any{"status": "ok"})
+	if body["dns"] != "ok" {
+		t.Errorf(`expected "ok", got %v`, body["dns"])
+	}
+	if _, present := body["dns_error"]; present {
+		t.Error("dns_error must not be set when nothing failed")
+	}
+}

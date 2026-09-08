@@ -54,13 +54,11 @@ func ReclaimExpiredLeases(ipList map[string]IPs, now time.Time, pdns *PDNSClient
 		ipList[e.NetworkKey][e.IPDigit] = entry
 
 		if e.HadDNS && e.Cluster != "" {
-			if pdns != nil {
-				pdns.DeleteRecord(e.Cluster)
-			}
-			if ddwrt != nil {
-				if err := ddwrt.DeleteRecord(e.Cluster); err != nil {
-					pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace).Warn("reclaimer ddwrt delete failed", pterm.DefaultLogger.Args("cluster", e.Cluster, "err", err))
-				}
+			var dns dnsResult
+			dns.remove(pdns, ddwrt, e.Cluster)
+			if dns.failed() {
+				logger := pterm.DefaultLogger.WithLevel(pterm.LogLevelTrace)
+				logger.Warn("reclaimer dns delete failed", logger.Args("cluster", e.Cluster, "err", dns.message()))
 			}
 		}
 	}
