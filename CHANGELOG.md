@@ -1,3 +1,11 @@
+## [1.25.16](https://github.com/stuttgart-things/clusterbook/compare/v1.25.15...v1.25.16) (2026-09-08)
+
+
+### Bug Fixes
+
+* **deps:** update module golang.org/x/crypto to v0.56.0 ([#184](https://github.com/stuttgart-things/clusterbook/issues/184)) ([c468620](https://github.com/stuttgart-things/clusterbook/commit/c4686208739b1e83ae1d29c39c0a4719d0ec46d7))
+* **deps:** update module sigs.k8s.io/controller-runtime to v0.25.0 ([#185](https://github.com/stuttgart-things/clusterbook/issues/185)) ([53c81a2](https://github.com/stuttgart-things/clusterbook/commit/53c81a28f6ebc1d547c6f39dccea78dc4ca982ce))
+
 ## [1.25.15](https://github.com/stuttgart-things/clusterbook/compare/v1.25.14...v1.25.15) (2026-08-26)
 
 
