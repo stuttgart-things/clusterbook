@@ -1,3 +1,10 @@
+## [1.28.1](https://github.com/stuttgart-things/clusterbook/compare/v1.28.0...v1.28.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* **provider:** allocate IPAssignments with reserve instead of list + assign ([#206](https://github.com/stuttgart-things/clusterbook/issues/206)) ([a20c84f](https://github.com/stuttgart-things/clusterbook/commit/a20c84fa53143d9706c5d1d7747251ab062a3cc7)), closes [#204](https://github.com/stuttgart-things/clusterbook/issues/204) [#205](https://github.com/stuttgart-things/clusterbook/issues/205)
+
 # [1.28.0](https://github.com/stuttgart-things/clusterbook/compare/v1.27.0...v1.28.0) (2026-09-11)
 
 
