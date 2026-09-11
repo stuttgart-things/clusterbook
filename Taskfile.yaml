@@ -155,9 +155,12 @@ tasks:
     dir: provider
     deps: [provider-test]
     env:
-      KO_DOCKER_REPO: ghcr.io/{{ .ORGA_NAME }}/provider-clusterbook
+      # Not provider-clusterbook: that image belongs to the separate
+      # stuttgart-things/provider-clusterbook repo (IPReservation), and --bare
+      # would overwrite its tags with this provider (IPAssignment/Network).
+      KO_DOCKER_REPO: ghcr.io/{{ .ORGA_NAME }}/clusterbook-provider
     cmds:
-      - ko build {{ .MODULE }}/provider --push
+      - ko build {{ .MODULE }}/provider --bare --tags {{ .VERSION }},latest --image-label org.opencontainers.image.source=https://github.com/{{ .ORGA_NAME }}/{{ .PROJECT_NAME }} --push
 
   commit:
     desc: Commit + push code into branch
