@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -18,6 +19,8 @@ import (
 	ipservice "github.com/stuttgart-things/clusterbook/ipservice"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -75,7 +78,17 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 
 	availableAddresses, err := internal.GenerateIPs(ipList, int(req.CountIpAddresses), req.NetworkKey)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		// A too-small pool or an unknown network is an answer to this request,
+		// not a reason to stop the server for every other caller.
+		logger.Error("FAILED TO GENERATE IPS", logger.Args("network", req.NetworkKey, "err", err.Error()))
+		switch {
+		case errors.Is(err, internal.ErrNetworkNotFound):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, internal.ErrNotEnoughAddresses):
+			return nil, status.Error(codes.ResourceExhausted, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
 	logger.Info("AVAILABLE ADDRESSES", logger.Args("", availableAddresses))

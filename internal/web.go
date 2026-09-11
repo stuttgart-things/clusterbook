@@ -271,7 +271,9 @@ func getPoolInfos(ipList map[string]IPs) []NetworkPoolInfo {
 				info.Assigned++
 			case strings.HasPrefix(ipInfo.Status, "PENDING"):
 				info.Pending++
-			default:
+			case isFree(ipInfo):
+				// Must match what the allocators hand out (issue #196), so an
+				// unrecognised status is counted in Total but never as Available.
 				info.Available++
 			}
 		}
@@ -651,7 +653,7 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	// Find an available IP
 	var foundDigit string
 	for digit, info := range networkIPs {
-		if info.Status == "" {
+		if isFree(info) {
 			foundDigit = digit
 			break
 		}
