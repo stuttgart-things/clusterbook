@@ -87,12 +87,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			return managed.ExternalObservation{}, errors.Wrap(err, errObserve)
 		}
 
-		var existing []client.IPEntry
-		for _, entry := range entries {
-			if entry.Cluster == cr.Spec.ForProvider.Cluster && strings.HasPrefix(entry.Status, "ASSIGNED") {
-				existing = append(existing, entry)
-			}
-		}
+		existing := heldBy(entries, cr.Spec.ForProvider.Cluster)
 
 		if len(existing) > 0 && len(existing) >= cr.Spec.ForProvider.CountIPs {
 			adopted := existing[:cr.Spec.ForProvider.CountIPs]
@@ -106,7 +101,10 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			cr.Status.AtProvider.LeaseExpiresAt = minLeaseExpiresAt(adopted)
 			meta.SetExternalName(cr, cr.Spec.ForProvider.Cluster+"/"+cr.Spec.ForProvider.NetworkKey)
 			cr.SetConditions(xpv1.Available())
-			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+			// Adoption usually follows a Create that failed after reserving —
+			// often on DNS. Let Update re-create the record once (idempotent)
+			// instead of settling on one that may never have landed (issue #205).
+			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: !cr.Spec.ForProvider.CreateDNS}, nil
 		}
 
 		return managed.ExternalObservation{ResourceExists: false}, nil
@@ -166,6 +164,29 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: upToDate}, nil
 }
 
+// heldBy returns the entries assigned to cluster, in the server's order. Observe
+// adopts them and Create counts them, so both must agree on what "held" means.
+func heldBy(entries []client.IPEntry, cluster string) []client.IPEntry {
+	var held []client.IPEntry
+	for _, entry := range entries {
+		if entry.Cluster == cluster && entry.Status != "" {
+			held = append(held, entry)
+		}
+	}
+	return held
+}
+
+// countFree returns how many entries carry no status, clusterbook's definition of free.
+func countFree(entries []client.IPEntry) int {
+	free := 0
+	for _, entry := range entries {
+		if entry.Status == "" {
+			free++
+		}
+	}
+	return free
+}
+
 // minLeaseExpiresAt returns the earliest lease expiry across entries, or 0
 // if any entry has no lease (meaning the set as a whole has no lease horizon).
 func minLeaseExpiresAt(entries []client.IPEntry) int64 {
@@ -187,45 +208,65 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotIPAssignment)
 	}
 
-	countIPs := cr.Spec.ForProvider.CountIPs
+	p := cr.Spec.ForProvider
+	countIPs := p.CountIPs
 	if countIPs == 0 {
 		countIPs = 1
 	}
 
-	available, err := e.client.FindAvailableIPs(cr.Spec.ForProvider.NetworkKey, countIPs)
-	if err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
-	}
-
-	status := cr.Spec.ForProvider.Status
+	status := p.Status
 	if status == "" {
 		status = "ASSIGNED"
 	}
 
-	var assignedIPs []string
-	for _, entry := range available {
-		if err := e.client.AssignIP(
-			cr.Spec.ForProvider.NetworkKey,
-			entry.IP,
-			cr.Spec.ForProvider.Cluster,
-			status,
-			cr.Spec.ForProvider.CreateDNS,
-			cr.Spec.ForProvider.LeaseDurationSeconds,
-		); err != nil {
-			return managed.ExternalCreation{}, errors.Wrap(err, fmt.Sprintf("assigning IP %s", entry.IP))
+	entries, err := e.client.GetNetworkIPs(p.NetworkKey)
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
+	}
+	if entries == nil {
+		return managed.ExternalCreation{}, errors.Wrap(fmt.Errorf("network %s not found", p.NetworkKey), errCreate)
+	}
+
+	// Start from what the cluster already holds: a previous Create may have
+	// reserved some addresses before failing, and taking fresh ones again would
+	// leak those (issue #205).
+	var ips []string
+	for _, entry := range heldBy(entries, p.Cluster) {
+		ips = append(ips, entry.IP)
+	}
+	if len(ips) > countIPs {
+		ips = ips[:countIPs]
+	}
+
+	need := countIPs - len(ips)
+	if free := countFree(entries); free < need {
+		return managed.ExternalCreation{}, errors.Wrap(fmt.Errorf("not enough available IPs: need %d, have %d", need, free), errCreate)
+	}
+
+	// reserve lets clusterbook pick and record each address in one request. The
+	// former list-then-assign overwrote any address another writer took in
+	// between — and, since assign withdraws the previous holder's DNS record,
+	// took that record too.
+	for i := 0; i < need; i++ {
+		ip, err := e.client.ReserveIP(p.NetworkKey, p.Cluster, status, p.CreateDNS, p.LeaseDurationSeconds)
+		if err != nil {
+			// Record nothing: a partial status would read as complete. The next
+			// Create counts what was reserved so far and only adds the rest.
+			if ip != "" {
+				return managed.ExternalCreation{}, errors.Wrap(err, fmt.Sprintf("reserved IP %s", ip))
+			}
+			return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 		}
-		assignedIPs = append(assignedIPs, entry.IP)
+		ips = append(ips, ip)
 	}
 
-	cr.Status.AtProvider.IPAddresses = assignedIPs
-	if len(assignedIPs) > 0 {
-		cr.Status.AtProvider.IPAddress = assignedIPs[0]
-	}
-	if cr.Spec.ForProvider.LeaseDurationSeconds > 0 {
-		cr.Status.AtProvider.LeaseExpiresAt = time.Now().Unix() + cr.Spec.ForProvider.LeaseDurationSeconds
+	cr.Status.AtProvider.IPAddresses = ips
+	cr.Status.AtProvider.IPAddress = ips[0]
+	if p.LeaseDurationSeconds > 0 {
+		cr.Status.AtProvider.LeaseExpiresAt = time.Now().Unix() + p.LeaseDurationSeconds
 	}
 
-	meta.SetExternalName(cr, cr.Spec.ForProvider.Cluster+"/"+cr.Spec.ForProvider.NetworkKey)
+	meta.SetExternalName(cr, p.Cluster+"/"+p.NetworkKey)
 
 	return managed.ExternalCreation{}, nil
 }

@@ -121,7 +121,35 @@ func (c *Client) DeleteNetwork(networkKey string) error {
 	return nil
 }
 
-// AssignIP assigns an IP address to a cluster. When leaseDurationSeconds > 0,
+// ReserveIP asks clusterbook to pick a free address in networkKey and record it
+// for cluster in the same request, and returns that address. Unlike AssignIP it
+// never takes an address someone else holds, so it is the call for allocating
+// (issue #205). When leaseDurationSeconds > 0 the reservation carries a TTL.
+//
+// If the address was reserved but its DNS record was not written, both the
+// address and a *DNSError are returned.
+func (c *Client) ReserveIP(networkKey, cluster, status string, createDNS bool, leaseDurationSeconds int64) (string, error) {
+	body := map[string]interface{}{
+		"cluster":    cluster,
+		"status":     status,
+		"create_dns": createDNS,
+	}
+	if leaseDurationSeconds > 0 {
+		body["lease_duration_seconds"] = leaseDurationSeconds
+	}
+
+	var result struct {
+		IP string `json:"ip"`
+	}
+	path := "/api/v1/networks/" + networkKey + "/reserve"
+	err := c.postJSONResult(path, body, http.StatusOK, &result)
+	if result.IP == "" && err == nil {
+		return "", fmt.Errorf("POST %s: response carries no ip", path)
+	}
+	return result.IP, err
+}
+
+// AssignIP assigns a specific IP address to a cluster, overwriting any current holder. When leaseDurationSeconds > 0,
 // the assignment carries a TTL and will be auto-reclaimed after expiry.
 func (c *Client) AssignIP(networkKey, ip, cluster, status string, createDNS bool, leaseDurationSeconds int64) error {
 	body := map[string]interface{}{
@@ -250,6 +278,12 @@ func (e *DNSError) Error() string {
 }
 
 func (c *Client) postJSON(path string, body interface{}, expectedStatus int) error {
+	return c.postJSONResult(path, body, expectedStatus, nil)
+}
+
+// postJSONResult is postJSON that also decodes the response body into result
+// (when non-nil). The DNS verdict is still checked; result is filled either way.
+func (c *Client) postJSONResult(path string, body interface{}, expectedStatus int, result interface{}) error {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshaling request: %w", err)
@@ -265,7 +299,17 @@ func (c *Client) postJSON(path string, body interface{}, expectedStatus int) err
 		return c.readError(resp)
 	}
 
-	return checkDNSOutcome(path, resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("POST %s: reading response: %w", path, err)
+	}
+	if result != nil && len(raw) > 0 {
+		if err := json.Unmarshal(raw, result); err != nil {
+			return fmt.Errorf("POST %s: decoding response: %w", path, err)
+		}
+	}
+
+	return checkDNSOutcome(path, bytes.NewReader(raw))
 }
 
 // checkDNSOutcome turns a reported DNS failure into an error so the reconcile
