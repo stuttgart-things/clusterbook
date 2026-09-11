@@ -114,17 +114,23 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	// GET IPS FROM REQUEST
 	ips := strings.Split(req.IpAddressRange, ";")
 
-	// LOOP OVER ips
+	// LOOP OVER ips — returning early is safe: nothing is saved until the loop is done
 	for _, ip := range ips {
 		// TRUNCATE IP
 		ipKey, err := internal.TruncateIP(ip)
 		if err != nil {
-			log.Fatalf("error: %v", err)
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
 		ipDigit, err := internal.GetLastIPDigit(ip)
 		if err != nil {
-			log.Fatalf("error: %v", err)
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		// An unconfigured network has a nil map; writing into it panics and,
+		// with no recovery interceptor, takes the whole server down.
+		if _, ok := ipList[ipKey]; !ok {
+			return nil, status.Errorf(codes.NotFound, "NETWORK %s IS NOT CONFIGURED", ipKey)
 		}
 
 		entry := ipList[ipKey][ipDigit]
@@ -140,10 +146,10 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	}
 
 	fmt.Println(ipList)
-	status := fmt.Sprintf("CLUSTER %s SET WITH IP RANGE %s AND STATUS %s", req.ClusterName, req.IpAddressRange, req.Status)
+	result := fmt.Sprintf("CLUSTER %s SET WITH IP RANGE %s AND STATUS %s", req.ClusterName, req.IpAddressRange, req.Status)
 
 	// CONVERT THE STATUS TO UPPERCASE
-	status = strings.ToUpper(status)
+	result = strings.ToUpper(result)
 
 	// SAVE YAML FILE
 	switch loadConfigFrom {
@@ -157,7 +163,7 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 		log.Fatalf("INVALID LOAD_CONFIG_FROM VALUE: %s", loadConfigFrom)
 	}
 
-	return &ipservice.ClusterResponse{Status: status}, nil
+	return &ipservice.ClusterResponse{Status: result}, nil
 }
 
 func main() {
