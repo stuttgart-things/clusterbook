@@ -6,7 +6,7 @@ require (
 	github.com/crossplane/crossplane-runtime v1.20.11
 	github.com/pkg/errors v0.9.1
 	k8s.io/apimachinery v0.37.0
-	k8s.io/client-go v0.35.3
+	k8s.io/client-go v0.35.8
 	sigs.k8s.io/controller-runtime v0.22.5
 )
 
@@ -87,7 +87,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.35.3 // indirect
+	k8s.io/api v0.35.8 // indirect
 	k8s.io/apiextensions-apiserver v0.35.0 // indirect
 	k8s.io/code-generator v0.37.0 // indirect
 	k8s.io/component-base v0.35.0 // indirect
