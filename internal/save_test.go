@@ -121,7 +121,7 @@ func TestSaveYAMLToDisk_KeepsSymlink(t *testing.T) {
 }
 
 func TestSaveConfig_InvalidSource(t *testing.T) {
-	if err := SaveConfig(map[string]IPs{}, "nfs", t.TempDir(), "config.yaml"); err == nil {
+	if _, err := saveConfig(map[string]IPs{}, "nfs", t.TempDir(), "config.yaml", ""); err == nil {
 		t.Error("expected an error for an unknown LOAD_CONFIG_FROM value")
 	}
 }

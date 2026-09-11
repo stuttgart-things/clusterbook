@@ -12,6 +12,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// newDynamicClient is what load and save use; tests swap in a fake API server.
+var newDynamicClient = CreateDynamicKubeConfigClient
+
 func CreateDynamicKubeConfigClient() (dynClient dynamic.Interface, err error) {
 	// Build the Kubernetes config
 	kubeConfig, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))

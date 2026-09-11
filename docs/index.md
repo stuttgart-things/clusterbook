@@ -30,7 +30,7 @@ LOAD_CONFIG_FROM=cr CONFIG_LOCATION=clusterbook CONFIG_NAME=networks-labul go ru
 
 | Interface | Port | Description |
 |-----------|------|-------------|
-| gRPC | `:50051` | `GetIpAddressRange`, `SetClusterInfo` RPCs |
+| gRPC | `:50051` | `ReserveIpAddresses`, `SetClusterInfo`, `GetIpAddressRange` (preview, does not reserve) |
 | REST API | `:8080` | JSON endpoints for networks and IP management |
 | HTMX Dashboard | `:8080` | Web UI with pool visualization and inline assign/release |
 

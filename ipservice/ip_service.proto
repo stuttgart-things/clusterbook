@@ -5,8 +5,14 @@ package ipservice;
 option go_package = "github.com/stuttgart-things/clusterbook";
 
 service IpService {
+  // GetIpAddressRange returns free addresses WITHOUT recording them: two callers
+  // can receive the same addresses, and one that never calls SetClusterInfo holds
+  // an address the ledger does not know. Use ReserveIpAddresses to allocate.
   rpc GetIpAddressRange (IpRequest) returns (IpResponse);
   rpc SetClusterInfo (ClusterRequest) returns (ClusterResponse);
+  // ReserveIpAddresses picks free addresses and records them for the cluster in
+  // one step. The response lists them separated by ";".
+  rpc ReserveIpAddresses (ReserveRequest) returns (IpResponse);
 }
 
 message IpRequest {
@@ -22,6 +28,13 @@ message ClusterRequest {
   string ipAddressRange = 1;
   string clusterName = 2;
   string status = 3; // Add this field
+}
+
+message ReserveRequest {
+  int32 countIpAddresses = 1;
+  string networkKey = 2;
+  string clusterName = 3;
+  string status = 4; // defaults to ASSIGNED; DNS is not managed over gRPC
 }
 
 message ClusterResponse {
