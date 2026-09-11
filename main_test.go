@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stuttgart-things/clusterbook/internal"
 	ipservice "github.com/stuttgart-things/clusterbook/ipservice"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -125,5 +126,64 @@ func TestGetIpAddressRange_SkipsAssignedDNS(t *testing.T) {
 	}
 	if resp.IpAddressRange != "10.31.103.6" {
 		t.Errorf("IpAddressRange = %q, want the only free address 10.31.103.6", resp.IpAddressRange)
+	}
+}
+
+// An IP outside every configured network used to write into a nil map and panic,
+// and unparsable input hit log.Fatalf — either one ended the server. A regression
+// here would crash the test binary rather than fail an assertion.
+func TestSetClusterInfo_RejectsBadInputWithoutWriting(t *testing.T) {
+	useDiskConfig(t, grpcTestConfigYAML)
+	path := filepath.Join(configLocation, configName)
+
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name string
+		ips  string
+		want codes.Code
+	}{
+		// The valid first IP proves nothing is saved when a later one fails.
+		{"unknown network", "10.31.103.6;10.99.99.1", codes.NotFound},
+		{"not an ip", "10.31.103.6;bogus", codes.InvalidArgument},
+		{"empty range", "", codes.InvalidArgument},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := (&server{}).SetClusterInfo(context.Background(),
+				&ipservice.ClusterRequest{IpAddressRange: tt.ips, ClusterName: "probe", Status: "ASSIGNED"})
+			if got := status.Code(err); got != tt.want {
+				t.Fatalf("code = %v (err %v), want %v", got, err, tt.want)
+			}
+
+			after, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(after) != string(before) {
+				t.Errorf("config was rewritten despite the error:\n%s", after)
+			}
+		})
+	}
+}
+
+func TestSetClusterInfo_PersistsAssignment(t *testing.T) {
+	useDiskConfig(t, grpcTestConfigYAML)
+
+	if _, err := (&server{}).SetClusterInfo(context.Background(),
+		&ipservice.ClusterRequest{IpAddressRange: "10.31.103.6", ClusterName: "probe", Status: "ASSIGNED"}); err != nil {
+		t.Fatalf("SetClusterInfo: %v", err)
+	}
+
+	ipList, err := internal.LoadProfile(loadConfigFrom, configLocation, configName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ipList["10.31.103"]["6"]; got.Status != "ASSIGNED" || got.Cluster != "probe" {
+		t.Errorf("entry .6 = %+v, want ASSIGNED/probe", got)
 	}
 }
