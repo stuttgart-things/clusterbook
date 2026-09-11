@@ -187,3 +187,26 @@ func TestSetClusterInfo_PersistsAssignment(t *testing.T) {
 		t.Errorf("entry .6 = %+v, want ASSIGNED/probe", got)
 	}
 }
+
+// Issue #200: in cr mode the save error was printed and the RPC still reported
+// success; disk mode could not even see the error.
+func TestSetClusterInfo_SaveFailureReturnsInternal(t *testing.T) {
+	useDiskConfig(t, grpcTestConfigYAML)
+
+	if err := os.Chmod(configLocation, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	dir := configLocation
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if probe, err := os.CreateTemp(configLocation, "probe-*"); err == nil {
+		_ = probe.Close()
+		_ = os.Remove(probe.Name())
+		t.Skip("directory permissions are not enforced here (running as root?)")
+	}
+
+	resp, err := (&server{}).SetClusterInfo(context.Background(),
+		&ipservice.ClusterRequest{IpAddressRange: "10.31.103.6", ClusterName: "probe", Status: "ASSIGNED"})
+	if got := status.Code(err); got != codes.Internal {
+		t.Fatalf("code = %v (resp %v, err %v), want Internal", got, resp, err)
+	}
+}

@@ -151,16 +151,10 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	// CONVERT THE STATUS TO UPPERCASE
 	result = strings.ToUpper(result)
 
-	// SAVE YAML FILE
-	switch loadConfigFrom {
-	case "disk":
-		internal.SaveYAMLToDisk(ipList, configLocation+"/"+configName)
-	case "cr":
-		ipListCR := internal.ConvertToCRFormat(ipList)
-		err := internal.CreateOrUpdateNetworkConfig(ipListCR, configName, configLocation)
-		fmt.Println(err)
-	default:
-		log.Fatalf("INVALID LOAD_CONFIG_FROM VALUE: %s", loadConfigFrom)
+	// SAVE — a failed write must not be reported as a success (issue #200)
+	if err := internal.SaveConfig(ipList, loadConfigFrom, configLocation, configName); err != nil {
+		logger.Error("FAILED TO SAVE CONFIG", logger.Args("err", err.Error()))
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	return &ipservice.ClusterResponse{Status: result}, nil

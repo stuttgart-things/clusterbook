@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -16,30 +17,63 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func SaveYAMLToDisk(ipList map[string]IPs, filename string) {
-	// Marshal the data to YAML format
+// SaveConfig persists the IP list to the configured backend. Callers must not
+// report success, or touch DNS, when it fails (issue #200).
+func SaveConfig(ipList map[string]IPs, source, configLocation, configName string) error {
+	switch source {
+	case "disk":
+		return SaveYAMLToDisk(ipList, configLocation+"/"+configName)
+	case "cr":
+		if err := CreateOrUpdateNetworkConfig(ConvertToCRFormat(ipList), configName, configLocation); err != nil {
+			return fmt.Errorf("save config: networkconfig %q in namespace %q: %w", configName, configLocation, err)
+		}
+		return nil
+	default:
+		return fmt.Errorf("save config: invalid LOAD_CONFIG_FROM value: %q", source)
+	}
+}
+
+// SaveYAMLToDisk writes the IP list atomically: a temp file in the same
+// directory, then a rename over the target. Writing in place with O_TRUNC
+// emptied the config before a write that could still fail.
+func SaveYAMLToDisk(ipList map[string]IPs, filename string) error {
 	yamlData, err := yaml.Marshal(ipList)
 	if err != nil {
-		fmt.Printf("Error marshaling YAML: %v\n", err)
-		return
+		return fmt.Errorf("save yaml: marshal: %w", err)
 	}
 
-	// Open the file with O_CREATE and O_TRUNC flags to overwrite if it exists
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	// Rename replaces a symlink rather than following it, so resolve it first
+	// and write next to the real file.
+	target := filename
+	if resolved, err := filepath.EvalSymlinks(filename); err == nil {
+		target = resolved
+	}
+
+	tmp, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+".tmp-*")
 	if err != nil {
-		fmt.Printf("Error opening file: %v\n", err)
-		return
+		return fmt.Errorf("save yaml: create temp file for %q: %w", target, err)
 	}
-	defer file.Close()
+	defer os.Remove(tmp.Name()) // no-op once the rename succeeded
 
-	// Write the YAML data to the file
-	_, err = file.Write(yamlData)
-	if err != nil {
-		fmt.Printf("Error writing file: %v\n", err)
-		return
+	if _, err := tmp.Write(yamlData); err != nil {
+		tmp.Close()
+		return fmt.Errorf("save yaml: write %q: %w", tmp.Name(), err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return fmt.Errorf("save yaml: sync %q: %w", tmp.Name(), err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("save yaml: close %q: %w", tmp.Name(), err)
+	}
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+		return fmt.Errorf("save yaml: chmod %q: %w", tmp.Name(), err)
+	}
+	if err := os.Rename(tmp.Name(), target); err != nil {
+		return fmt.Errorf("save yaml: rename onto %q: %w", target, err)
 	}
 
-	fmt.Printf("YAML data successfully written to %s\n", filename)
+	return nil
 }
 
 func CreateOrUpdateNetworkConfig(info map[string][]string, resourceName, namespace string) error {
