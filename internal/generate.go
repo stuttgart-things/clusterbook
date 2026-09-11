@@ -22,6 +22,20 @@ type IPInfo struct {
 
 type IPs map[string]IPInfo
 
+var (
+	ErrNotEnoughAddresses = errors.New("NOT ENOUGH AVAILABLE ADDRESSES")
+	ErrNetworkNotFound    = errors.New("KEY DOES NOT EXIST")
+)
+
+// isFree reports whether an address may be handed out. Only an empty status is
+// free: release and the lease reclaimer both reset to "", and nothing writes any
+// other "free" marker. Matching on known busy statuses instead is what issue #196
+// was — "ASSIGNED:DNS" did not equal "ASSIGNED", so in-use addresses were offered.
+// Every allocator and the pool counts must ask this, never test Status themselves.
+func isFree(info IPInfo) bool {
+	return info.Status == ""
+}
+
 func GenerateIPs(ipList map[string]IPs, requestedIPs int, networkKey string) (randomValues []string, err error) {
 	var availableAddresses []string
 
@@ -36,10 +50,7 @@ func GenerateIPs(ipList map[string]IPs, requestedIPs int, networkKey string) (ra
 			fmt.Println("ClusterName:", adressStatus.Cluster)
 			fmt.Println("Status:", adressStatus.Status)
 
-			switch adressStatus.Status {
-			case "PENDING", "ASSIGNED":
-				// DO NOTHING
-			default:
+			if isFree(adressStatus) {
 				availableAddresses = append(availableAddresses, address)
 			}
 		}
@@ -52,12 +63,12 @@ func GenerateIPs(ipList map[string]IPs, requestedIPs int, networkKey string) (ra
 
 		} else {
 			fmt.Println("NOT ENOUGH AVAILABLE ADDRESSES")
-			err = errors.New("NOT ENOUGH AVAILABLE ADDRESSES")
+			err = ErrNotEnoughAddresses
 		}
 
 	} else {
 		fmt.Println("KEY DOES NOT EXIST")
-		err = errors.New("KEY DOES NOT EXIST")
+		err = ErrNetworkNotFound
 	}
 
 	return
