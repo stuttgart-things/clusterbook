@@ -2,11 +2,13 @@ package internal
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -981,5 +983,229 @@ func TestWriteHandlers_SaveFailure(t *testing.T) {
 				t.Errorf("config changed despite the failed save:\n%s", after)
 			}
 		})
+	}
+}
+
+// ── Issue #201: claiming a specific address ─────────────────────────────────
+
+func TestHostDigit(t *testing.T) {
+	tests := []struct {
+		ip, key, want string
+		wantErr       bool
+	}{
+		{"10.31.103.6", "10.31.103", "6", false},
+		{"6", "10.31.103", "6", false},
+		{"10.31.103.230", "10.31.103", "230", false},
+		{"10.99.99.7", "10.31.103", "", true}, // other network: used to land on digit 7
+		{"10.31.103", "10.31.103", "", true},  // not an address
+		{"06", "10.31.103", "", true},
+		{"256", "10.31.103", "", true},
+		{"abc", "10.31.103", "", true},
+		{"", "10.31.103", "", true},
+	}
+	for _, tt := range tests {
+		got, err := hostDigit(tt.ip, tt.key)
+		if (err != nil) != tt.wantErr || got != tt.want {
+			t.Errorf("hostDigit(%q, %q) = %q, %v; want %q, err=%v", tt.ip, tt.key, got, err, tt.want, tt.wantErr)
+		}
+	}
+}
+
+func reserveSpecific(t *testing.T, dir, name, body string, ddwrt *DDWRTClient) (*httptest.ResponseRecorder, map[string]any) {
+	t.Helper()
+	req := httptest.NewRequest("POST", "/api/v1/networks/10.31.103/reserve", strings.NewReader(body))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+	handleAPIReserve(w, req, "disk", dir, name, nil, ddwrt)
+
+	var resp map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	return w, resp
+}
+
+func TestHandleAPIReserve_SpecificFreeIP(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+	exec := newFakeExecutor()
+
+	w, resp := reserveSpecific(t, dir, name, `{"cluster":"labda-dev-a","ip":"10.31.103.7","create_dns":true}`,
+		newDDWRTClientWithExecutor("sthings.lab", exec))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, body %s", w.Code, w.Body.String())
+	}
+	if resp["ip"] != "10.31.103.7" || resp["dns"] != "ok" {
+		t.Errorf("response = %v", resp)
+	}
+	if _, present := resp["added_to_pool"]; present {
+		t.Error("added_to_pool must be absent for an address already in the pool")
+	}
+	if !strings.Contains(exec.nvram["dnsmasq_options"], "/labda-dev-a.sthings.lab/10.31.103.7") {
+		t.Errorf("DNS record not written: %q", exec.nvram["dnsmasq_options"])
+	}
+
+	ipList, _ := LoadProfile("disk", dir, name)
+	if got := ipList["10.31.103"]["7"]; got.Cluster != "labda-dev-a" || got.Status != "ASSIGNED:DNS" {
+		t.Errorf("ledger entry = %+v", got)
+	}
+}
+
+// Unlike assign, reserve with "ip" refuses a taken address and names its holder.
+func TestHandleAPIReserve_SpecificTakenIPConflicts(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+	before, _ := os.ReadFile(filepath.Join(dir, name))
+	exec := newFakeExecutor()
+
+	w, resp := reserveSpecific(t, dir, name, `{"cluster":"intruder","ip":"10.31.103.5","create_dns":true}`,
+		newDDWRTClientWithExecutor("sthings.lab", exec))
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("code = %d, want 409; body %s", w.Code, w.Body.String())
+	}
+	if resp["cluster"] != "mycluster" || resp["status"] != "ASSIGNED:DNS" {
+		t.Errorf("409 must name the current holder, got %v", resp)
+	}
+	if len(exec.calls) != 0 {
+		t.Errorf("DNS touched for a refused reservation: %v", exec.calls)
+	}
+	if after, _ := os.ReadFile(filepath.Join(dir, name)); string(after) != string(before) {
+		t.Error("config changed despite the conflict")
+	}
+}
+
+func TestHandleAPIReserve_SpecificIPValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want int
+	}{
+		{"other network", `{"cluster":"c","ip":"10.99.99.7"}`, http.StatusBadRequest},
+		{"garbage", `{"cluster":"c","ip":"10.31.103.x"}`, http.StatusBadRequest},
+		{"not in pool", `{"cluster":"c","ip":"10.31.103.230"}`, http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, name := setupTestConfig(t, testConfigYAML)
+			before, _ := os.ReadFile(filepath.Join(dir, name))
+
+			w, resp := reserveSpecific(t, dir, name, tt.body, nil)
+			if w.Code != tt.want {
+				t.Fatalf("code = %d, want %d; body %s", w.Code, tt.want, w.Body.String())
+			}
+			if msg, _ := resp["error"].(string); msg == "" {
+				t.Errorf("expected a JSON error message, got %s", w.Body.String())
+			}
+			if after, _ := os.ReadFile(filepath.Join(dir, name)); string(after) != string(before) {
+				t.Error("config changed for a rejected request")
+			}
+		})
+	}
+}
+
+// The #196 case: an address picked by hand before the ledger knew about it.
+func TestHandleAPIReserve_SpecificIPAddedToPool(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	w, resp := reserveSpecific(t, dir, name, `{"cluster":"labda-dev-a","ip":"10.31.103.230","add_to_pool":true}`, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, body %s", w.Code, w.Body.String())
+	}
+	if resp["added_to_pool"] != true {
+		t.Errorf("expected added_to_pool, got %v", resp)
+	}
+
+	ipList, _ := LoadProfile("disk", dir, name)
+	if got, ok := ipList["10.31.103"]["230"]; !ok || got.Cluster != "labda-dev-a" {
+		t.Errorf("entry .230 = %+v (present %v)", got, ok)
+	}
+}
+
+func TestHandleAPIReserve_SpecificIPConcurrentClaims(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	const n = 10
+	codes := make([]int, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			w, _ := reserveSpecific(t, dir, name, fmt.Sprintf(`{"cluster":"c%d","ip":"10.31.103.7"}`, i), nil)
+			codes[i] = w.Code
+		}(i)
+	}
+	wg.Wait()
+
+	won := 0
+	for _, code := range codes {
+		switch code {
+		case http.StatusOK:
+			won++
+		case http.StatusConflict:
+		default:
+			t.Errorf("unexpected code %d", code)
+		}
+	}
+	if won != 1 {
+		t.Errorf("%d requests won 10.31.103.7, want exactly 1 (codes %v)", won, codes)
+	}
+}
+
+func TestHandleAPIAssign_RejectsIPFromOtherNetwork(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+	before, _ := os.ReadFile(filepath.Join(dir, name))
+
+	req := httptest.NewRequest("POST", "/", strings.NewReader(`{"ip":"10.99.99.7","cluster":"probe"}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+	handleAPIAssign(w, req, "disk", dir, name, nil, nil)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d, want 400; body %s", w.Code, w.Body.String())
+	}
+	if after, _ := os.ReadFile(filepath.Join(dir, name)); string(after) != string(before) {
+		t.Error("digit 7 of 10.31.103 was written for an address in 10.99.99")
+	}
+}
+
+// assign still overwrites, but reports who held the address and withdraws that
+// cluster's record instead of leaving it resolving to someone else's address.
+func TestHandleAPIAssign_OverwriteReportsAndWithdrawsPreviousDNS(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+	exec := newFakeExecutor()
+	exec.nvram["dnsmasq_options"] = "address=/mycluster.sthings.lab/10.31.103.5"
+
+	req := httptest.NewRequest("POST", "/", strings.NewReader(`{"ip":"10.31.103.5","cluster":"newowner","create_dns":true}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+	handleAPIAssign(w, req, "disk", dir, name, nil, newDDWRTClientWithExecutor("sthings.lab", exec))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, body %s", w.Code, w.Body.String())
+	}
+	body := decodeJSON(t, w)
+	if body["previous_cluster"] != "mycluster" || body["previous_status"] != "ASSIGNED:DNS" {
+		t.Errorf("previous holder not reported: %v", body)
+	}
+
+	opts := exec.nvram["dnsmasq_options"]
+	if strings.Contains(opts, "mycluster") {
+		t.Errorf("previous cluster's record still served: %q", opts)
+	}
+	if !strings.Contains(opts, "/newowner.sthings.lab/10.31.103.5") {
+		t.Errorf("new record missing: %q", opts)
+	}
+}
+
+func TestHandleAPIAssign_FreeAddressHasNoPreviousHolder(t *testing.T) {
+	dir, name := setupTestConfig(t, testConfigYAML)
+
+	req := httptest.NewRequest("POST", "/", strings.NewReader(`{"ip":"10.31.103.7","cluster":"probe"}`))
+	req.SetPathValue("key", "10.31.103")
+	w := httptest.NewRecorder()
+	handleAPIAssign(w, req, "disk", dir, name, nil, nil)
+
+	body := decodeJSON(t, w)
+	if _, present := body["previous_cluster"]; present {
+		t.Errorf("previous_cluster set for a free address: %v", body)
 	}
 }
