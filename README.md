@@ -457,6 +457,11 @@ envFrom:
 
 The [`provider/`](./provider) directory contains a Crossplane provider that wraps clusterbook's REST API as declarative managed resources. Point a `ProviderConfig` at a running clusterbook instance, then create `Network` and `IPAssignment` CRs to drive pool creation and IP allocation from Git.
 
+Its controller image is `ghcr.io/stuttgart-things/clusterbook-provider`, built with
+`task provider-build-ko` (tagged with the repo version and `latest`). Not to be
+confused with [`stuttgart-things/provider-clusterbook`](https://github.com/stuttgart-things/provider-clusterbook),
+a separate provider (`IPReservation`) published as `ghcr.io/stuttgart-things/provider-clusterbook`.
+
 <details><summary>EXAMPLE</summary>
 
 ```yaml

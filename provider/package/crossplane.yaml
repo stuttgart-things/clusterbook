@@ -8,4 +8,4 @@ metadata:
     meta.crossplane.io/description: Crossplane provider for clusterbook IPAM
 spec:
   controller:
-    image: ghcr.io/stuttgart-things/provider-clusterbook:latest
+    image: ghcr.io/stuttgart-things/clusterbook-provider:latest
