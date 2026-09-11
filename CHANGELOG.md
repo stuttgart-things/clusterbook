@@ -1,3 +1,10 @@
+## [1.28.2](https://github.com/stuttgart-things/clusterbook/compare/v1.28.1...v1.28.2) (2026-09-11)
+
+
+### Bug Fixes
+
+* **provider:** publish the in-repo provider under its own image name ([#207](https://github.com/stuttgart-things/clusterbook/issues/207)) ([191827c](https://github.com/stuttgart-things/clusterbook/commit/191827cf07fa88bdd0e148b21cfe79d1b5dbaa6e))
+
 ## [1.28.1](https://github.com/stuttgart-things/clusterbook/compare/v1.28.0...v1.28.1) (2026-09-11)
 
 
