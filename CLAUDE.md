@@ -296,6 +296,7 @@ grpcurl -plaintext localhost:50051 ipservice.IpService/GetIpAddressRange \
 - Env vars: `SCREAMING_SNAKE_CASE`, read only in `main.go` var block, passed as constructor args
 - Constructor returns `nil` when disabled — callers always nil-check
 - DNS provider methods return `error`; every call site must report it, never drop it (issue #187)
+- Ledger writes go through `SaveConfig` (HTTP: `if !saveConfigHTTP(w, ...) { return }`), and the handler returns **before** any DNS call when it fails — a record must never exist for a change the ledger does not hold (issue #200)
 - The `:DNS` status marker is applied via `withDNSSuffix` — never `status + ":DNS"`, which doubles it
 - Pure helper functions (no I/O) in same file as provider, named without receiver — keeps them unit-testable
 - Test file naming: `<provider>_test.go` in same package (`package internal`)

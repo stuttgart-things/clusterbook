@@ -828,3 +828,158 @@ func TestDNSResult_AnnotateOmitsErrorOnSuccess(t *testing.T) {
 		t.Error("dns_error must not be set when nothing failed")
 	}
 }
+
+// ── Issue #200: a failed save must not answer success or touch DNS ──────────
+
+// TestWriteHandlers_SaveFailure drives every handler that writes the ledger into
+// a read-only config. Each must answer 500 with nothing appended, leave the file
+// as it was, and make no DNS call — before issue #200 they answered 200 and
+// created or removed records for changes that were never persisted.
+func TestWriteHandlers_SaveFailure(t *testing.T) {
+	type handlerFn func(w http.ResponseWriter, r *http.Request, dir, name string, ddwrt *DDWRTClient)
+
+	jsonReq := func(method, target, body string, pathValues ...string) *http.Request {
+		r := httptest.NewRequest(method, target, strings.NewReader(body))
+		for i := 0; i+1 < len(pathValues); i += 2 {
+			r.SetPathValue(pathValues[i], pathValues[i+1])
+		}
+		return r
+	}
+	formReq := func(target, form string) *http.Request {
+		r := httptest.NewRequest("POST", target, strings.NewReader(form))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		return r
+	}
+
+	tests := []struct {
+		name    string
+		req     func() *http.Request
+		handler handlerFn
+	}{
+		{"htmx assign", func() *http.Request {
+			return formReq("/htmx/assign", "ip=10.31.103.7&cluster=probe&status=ASSIGNED&network_key=10.31.103&create_dns=on")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, dd *DDWRTClient) {
+			handleHTMXAssign(w, r, "disk", d, n, nil, dd)
+		}},
+		{"htmx release", func() *http.Request {
+			return formReq("/htmx/release", "ip=10.31.103.5&network_key=10.31.103")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, dd *DDWRTClient) {
+			handleHTMXRelease(w, r, "disk", d, n, nil, dd)
+		}},
+		{"api assign", func() *http.Request {
+			return jsonReq("POST", "/", `{"ip":"10.31.103.7","cluster":"probe","create_dns":true}`, "key", "10.31.103")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, dd *DDWRTClient) {
+			handleAPIAssign(w, r, "disk", d, n, nil, dd)
+		}},
+		{"api reserve", func() *http.Request {
+			return jsonReq("POST", "/", `{"cluster":"probe","create_dns":true}`, "key", "10.31.103")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, dd *DDWRTClient) {
+			handleAPIReserve(w, r, "disk", d, n, nil, dd)
+		}},
+		{"api release", func() *http.Request {
+			return jsonReq("POST", "/", `{"ip":"10.31.103.5"}`, "key", "10.31.103")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, dd *DDWRTClient) {
+			handleAPIRelease(w, r, "disk", d, n, nil, dd)
+		}},
+		{"api renew lease", func() *http.Request {
+			return jsonReq("POST", "/", `{"lease_duration_seconds":60}`, "key", "10.31.103", "ip", "10.31.103.5")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, _ *DDWRTClient) {
+			handleAPIRenewLease(w, r, "disk", d, n)
+		}},
+		{"api create network (list)", func() *http.Request {
+			return jsonReq("POST", "/", `{"network":"10.40.2","ips":["1"]}`)
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, _ *DDWRTClient) {
+			handleAPICreateNetwork(w, r, "disk", d, n)
+		}},
+		{"api create network (cidr)", func() *http.Request {
+			return jsonReq("POST", "/", `{"cidr":"10.40.1.0/30"}`)
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, _ *DDWRTClient) {
+			handleAPICreateNetwork(w, r, "disk", d, n)
+		}},
+		{"api create network from cidr", func() *http.Request {
+			return jsonReq("POST", "/", `{"cidr":"10.40.3.0/30"}`)
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, _ *DDWRTClient) {
+			handleAPICreateNetworkFromCIDR(w, r, "disk", d, n)
+		}},
+		{"api delete network", func() *http.Request {
+			return jsonReq("DELETE", "/", ``, "key", "10.31.104")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, _ *DDWRTClient) {
+			handleAPIDeleteNetwork(w, r, "disk", d, n)
+		}},
+		{"api add ip", func() *http.Request {
+			return jsonReq("POST", "/", `{"ips":["8"]}`, "key", "10.31.103")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, _ *DDWRTClient) {
+			handleAPIAddIP(w, r, "disk", d, n)
+		}},
+		{"api delete ip", func() *http.Request {
+			return jsonReq("DELETE", "/", ``, "key", "10.31.103", "ip", "5")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, dd *DDWRTClient) {
+			handleAPIDeleteIP(w, r, "disk", d, n, nil, dd)
+		}},
+		{"api edit ip", func() *http.Request {
+			return jsonReq("PUT", "/", `{"cluster":"other","status":"ASSIGNED","create_dns":true}`, "key", "10.31.103", "ip", "5")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, dd *DDWRTClient) {
+			handleAPIEditIP(w, r, "disk", d, n, nil, dd)
+		}},
+		{"htmx add network", func() *http.Request {
+			return formReq("/htmx/add-network", "network=10.40.4&ip_from=1&ip_to=2")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, _ *DDWRTClient) {
+			handleHTMXAddNetwork(w, r, "disk", d, n)
+		}},
+		{"htmx add ip", func() *http.Request {
+			return formReq("/htmx/add-ip", "network_key=10.31.103&ip=9")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, _ *DDWRTClient) {
+			handleHTMXAddIP(w, r, "disk", d, n)
+		}},
+		{"htmx delete ip", func() *http.Request {
+			return formReq("/htmx/delete-ip", "network_key=10.31.103&ip=10.31.103.5")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, dd *DDWRTClient) {
+			handleHTMXDeleteIP(w, r, "disk", d, n, nil, dd)
+		}},
+		{"htmx edit", func() *http.Request {
+			return formReq("/htmx/edit", "ip=10.31.103.5&cluster=other&status=ASSIGNED&network_key=10.31.103&create_dns=on")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, dd *DDWRTClient) {
+			handleHTMXEdit(w, r, "disk", d, n, nil, dd)
+		}},
+		{"htmx delete network", func() *http.Request {
+			return formReq("/htmx/delete-network", "network_key=10.31.104")
+		}, func(w http.ResponseWriter, r *http.Request, d, n string, _ *DDWRTClient) {
+			handleHTMXDeleteNetwork(w, r, "disk", d, n)
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, name := readOnlyConfig(t, testConfigYAML)
+			before, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			exec := newFakeExecutor()
+			w := httptest.NewRecorder()
+			tt.handler(w, tt.req(), dir, name, newDDWRTClientWithExecutor("sthings.lab", exec))
+
+			if w.Code != http.StatusInternalServerError {
+				t.Errorf("code = %d, want 500; body: %s", w.Code, w.Body.String())
+			}
+			if body := strings.TrimSpace(w.Body.String()); body != "failed to save network config" {
+				t.Errorf("handler kept writing after the failed save; body: %q", body)
+			}
+			if redirect := w.Header().Get("HX-Redirect"); redirect != "" {
+				t.Errorf("HX-Redirect %q sent for an unsaved change", redirect)
+			}
+			if len(exec.calls) != 0 {
+				t.Errorf("DNS was touched for an unsaved change: %v", exec.calls)
+			}
+
+			after, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(after) != string(before) {
+				t.Errorf("config changed despite the failed save:\n%s", after)
+			}
+		})
+	}
+}

@@ -45,7 +45,7 @@ func TestReclaimExpiredLeasesClearsEntry(t *testing.T) {
 		},
 	}
 
-	reclaimed := ReclaimExpiredLeases(ipList, now, nil, nil)
+	reclaimed := ReclaimExpiredLeases(ipList, now)
 	if len(reclaimed) != 1 {
 		t.Fatalf("expected 1 reclaimed, got %d", len(reclaimed))
 	}
@@ -61,29 +61,71 @@ func TestReclaimExpiredLeasesClearsEntry(t *testing.T) {
 	}
 }
 
-func TestReclaimExpiredLeasesCallsDDWRTDelete(t *testing.T) {
-	now := time.Unix(1_700_000_000, 0)
+const reclaimConfigYAML = `
+10.31.103:
+  "6":
+    status: "ASSIGNED:DNS"
+    cluster: c
+    lease_expires_at: 1699999995
+  "7":
+    status: "ASSIGNED"
+    cluster: d
+    lease_expires_at: 1699999995
+`
 
-	ipList := map[string]IPs{
-		"10.31.103": {
-			"6": {Status: "ASSIGNED:DNS", Cluster: "c", LeaseExpiresAt: now.Unix() - 5},
-			"7": {Status: "ASSIGNED", Cluster: "d", LeaseExpiresAt: now.Unix() - 5}, // no DNS suffix
-		},
-	}
+func TestReclaimOnce_SavesThenRemovesDNS(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	dir, name := setupTestConfig(t, reclaimConfigYAML)
 
 	srv, err := NewFakeDDWRTServer("root", "testpass")
 	if err != nil {
 		t.Fatalf("fake ssh server: %v", err)
 	}
 	defer srv.Close()
-
 	srv.NvramSet("dnsmasq_options", "address=/c.sthings.lab/10.31.103.6")
-
 	ddwrt := NewDDWRTClient("true", srv.Addr, "root", "testpass", "sthings.lab")
-	ReclaimExpiredLeases(ipList, now, nil, ddwrt)
 
-	opts := srv.NvramGet("dnsmasq_options")
-	if opts != "" {
+	reclaimed, err := reclaimOnce("disk", dir, name, now, nil, ddwrt)
+	if err != nil {
+		t.Fatalf("reclaimOnce: %v", err)
+	}
+	if len(reclaimed) != 2 {
+		t.Fatalf("expected 2 reclaimed, got %d", len(reclaimed))
+	}
+
+	ipList, err := LoadProfile("disk", dir, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, digit := range []string{"6", "7"} {
+		if got := ipList["10.31.103"][digit]; !isFree(got) || got.Cluster != "" {
+			t.Errorf("digit %s: want cleared in the saved config, got %+v", digit, got)
+		}
+	}
+
+	if opts := srv.NvramGet("dnsmasq_options"); opts != "" {
 		t.Errorf("expected DNS entry removed, still have: %q", opts)
+	}
+}
+
+// Issue #200: the reclaimer removed DNS before saving and ignored the save error,
+// so a failed write left an address assigned in the ledger with its record gone.
+func TestReclaimOnce_SaveFailureKeepsDNS(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	dir, name := readOnlyConfig(t, reclaimConfigYAML)
+
+	exec := newFakeExecutor()
+	exec.nvram["dnsmasq_options"] = "address=/c.sthings.lab/10.31.103.6"
+	ddwrt := newDDWRTClientWithExecutor("sthings.lab", exec)
+
+	reclaimed, err := reclaimOnce("disk", dir, name, now, nil, ddwrt)
+	if err == nil {
+		t.Fatal("expected the save error to be returned")
+	}
+	if len(reclaimed) != 0 {
+		t.Errorf("nothing may count as reclaimed when the save failed, got %v", reclaimed)
+	}
+	if len(exec.calls) != 0 {
+		t.Errorf("DNS was touched for an unsaved reclaim: %v", exec.calls)
 	}
 }

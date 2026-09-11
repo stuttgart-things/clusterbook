@@ -440,7 +440,9 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	entry.Cluster = cluster
 	ipList[ipKey][ipDigit] = entry
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	var dns dnsResult
 	if createDNS {
@@ -486,7 +488,9 @@ func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	entry.Cluster = ""
 	ipList[ipKey][ipDigit] = entry
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	var dns dnsResult
 	if hadDNS {
@@ -596,7 +600,9 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	}
 	ipList[networkKey][ipDigit] = entry
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	var dns dnsResult
 	if req.CreateDNS {
@@ -682,7 +688,9 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	}
 	ipList[networkKey][foundDigit] = entry
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	var dns dnsResult
 	if req.CreateDNS {
@@ -734,7 +742,9 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	entry.LeaseExpiresAt = 0
 	ipList[networkKey][ipDigit] = entry
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	var dns dnsResult
 	if hadDNS {
@@ -794,7 +804,9 @@ func handleAPIRenewLease(w http.ResponseWriter, r *http.Request, loadFrom, confi
 	entry.LeaseExpiresAt = time.Now().Unix() + req.LeaseDurationSeconds
 	ipList[networkKey][ipDigit] = entry
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	writeJSON(w, map[string]any{
 		"status":           "ok",
@@ -849,7 +861,9 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 			totalIPs += len(octets)
 		}
 
-		saveConfig(ipList, loadFrom, configLoc, configNm)
+		if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+			return
+		}
 
 		writeJSONStatus(w, http.StatusCreated, map[string]any{
 			"status":   "ok",
@@ -875,7 +889,9 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 		ipList[req.Network][ip] = IPInfo{}
 	}
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	writeJSONStatus(w, http.StatusCreated, map[string]any{
 		"status":  "ok",
@@ -928,7 +944,9 @@ func handleAPICreateNetworkFromCIDR(w http.ResponseWriter, r *http.Request, load
 		totalIPs += len(octets)
 	}
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	writeJSONStatus(w, http.StatusCreated, map[string]any{
 		"status":   "ok",
@@ -950,7 +968,9 @@ func handleAPIDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 	}
 
 	delete(ipList, networkKey)
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	writeJSON(w, map[string]any{
 		"status":  "ok",
@@ -993,7 +1013,9 @@ func handleAPIAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 		}
 	}
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	writeJSONStatus(w, http.StatusCreated, map[string]any{
 		"status":  "ok",
@@ -1031,7 +1053,9 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	prevCluster := entry.Cluster
 
 	delete(ipList[networkKey], ip)
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	var dns dnsResult
 	if hadDNS {
@@ -1104,7 +1128,9 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	entry.Cluster = req.Cluster
 	ipList[networkKey][ipDigit] = entry
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	// Handle DNS changes. Remove the old record when DNS is turned off or the
 	// cluster changed. When DNS is on, always (re)create — both providers are
@@ -1279,7 +1305,9 @@ func handleHTMXAddNetwork(w http.ResponseWriter, r *http.Request, loadFrom, conf
 		ipList[network][strconv.Itoa(i)] = IPInfo{}
 	}
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	// Redirect to the new network's detail page
 	w.Header().Set("HX-Redirect", "/network/"+network)
@@ -1316,7 +1344,9 @@ func handleHTMXAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	}
 
 	ipList[networkKey][ip] = IPInfo{}
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	// Re-render the IP table
 	entries := getIPEntries(ipList[networkKey], networkKey)
@@ -1354,7 +1384,9 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 	prevCluster := entry.Cluster
 
 	delete(ipList[networkKey], ipDigit)
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	var dns dnsResult
 	if hadDNS {
@@ -1414,7 +1446,9 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	entry.Cluster = cluster
 	ipList[ipKey][ipDigit] = entry
 
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	// Handle DNS changes. Remove the old record when DNS is turned off or the
 	// cluster changed. When DNS is on, always (re)create — both providers are
@@ -1489,26 +1523,26 @@ func handleHTMXDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, c
 		return
 	}
 	delete(ipList, networkKey)
-	saveConfig(ipList, loadFrom, configLoc, configNm)
+	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		return
+	}
 
 	// Redirect to dashboard
 	w.Header().Set("HX-Redirect", "/")
 	w.WriteHeader(http.StatusOK)
 }
 
-// saveConfig persists the IP list based on the configured backend
-func saveConfig(ipList map[string]IPs, loadFrom, configLoc, configNm string) {
-	switch loadFrom {
-	case "disk":
-		SaveYAMLToDisk(ipList, configLoc+"/"+configNm)
-	case "cr":
-		ipListCR := ConvertToCRFormat(ipList)
-		if err := CreateOrUpdateNetworkConfig(ipListCR, configNm, configLoc); err != nil {
-			log.Printf("ERROR SAVING CR: %v", err)
-		}
-	default:
-		log.Printf("INVALID LOAD_CONFIG_FROM VALUE: %s", loadFrom)
+// saveConfigHTTP persists the IP list for an HTTP request, the write-side twin of
+// loadProfileHTTP. On failure it logs, writes a 500 and returns false; the handler
+// must return immediately — before any DNS call, so a record is never created or
+// removed for a change the ledger does not hold (issue #200).
+func saveConfigHTTP(w http.ResponseWriter, ipList map[string]IPs, loadFrom, configLoc, configNm string) bool {
+	if err := SaveConfig(ipList, loadFrom, configLoc, configNm); err != nil {
+		log.Printf("FAILED TO SAVE NETWORK CONFIG: %v", err)
+		http.Error(w, "failed to save network config", http.StatusInternalServerError)
+		return false
 	}
+	return true
 }
 
 // --- HTML Templates ---
