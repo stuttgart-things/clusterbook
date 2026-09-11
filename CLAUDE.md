@@ -362,6 +362,7 @@ Image is also scanned with Trivy after build.
 ## KNOWN PATTERNS TO FOLLOW
 
 - **Nil-safe providers**: `if pdns != nil { ... }` — never assume enabled
+- **Claiming a specific address**: `reserve` with `ip` (409 when taken, 404 unless `add_to_pool`) — `assign` overwrites by design and only reports `previous_cluster`; both reject an `ip` outside `{key}` via `hostDigit` (issue #201)
 - **One ledger write per operation**: never `LoadProfile` → modify → save by hand; overlapping writers lose updates (issue #199)
 - **Separate SSH commands**: run `set`, `commit` and the reload as individual commands — never one `&&` chain, so a failure names the failing step (issue #187)
 - **Reload fallback**: try every entry of `dnsmasqReloadCommands`; report NVRAM as committed when all fail

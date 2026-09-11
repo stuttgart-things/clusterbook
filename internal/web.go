@@ -148,6 +148,30 @@ func buildFQDN(cluster, zone string) string {
 	return fmt.Sprintf("*.%s.%s", cluster, zone)
 }
 
+// hostDigit returns the host part of ip within networkKey. ip may be the full
+// address ("10.31.103.6") or the host part alone ("6"). An address from another
+// network is an error: only the last octet used to be read, so "10.99.99.7"
+// sent to 10.31.103 silently wrote digit 7 there (issue #201).
+func hostDigit(ip, networkKey string) (string, error) {
+	digit := ip
+	if strings.Contains(ip, ".") {
+		key, err := TruncateIP(ip)
+		if err != nil {
+			return "", err
+		}
+		if key != networkKey {
+			return "", fmt.Errorf("ip %s is not in network %s", ip, networkKey)
+		}
+		digit = ip[strings.LastIndex(ip, ".")+1:]
+	}
+
+	// Pool keys are plain octets; "06" or "256" would create a digit no address has.
+	if n, err := strconv.Atoi(digit); err != nil || n < 0 || n > 255 || strconv.Itoa(n) != digit {
+		return "", fmt.Errorf("invalid host part %q in ip %q", digit, ip)
+	}
+	return digit, nil
+}
+
 // loadProfileHTTP loads the network config for an HTTP request. On failure it
 // logs the error, writes a 500 response, and returns ok=false so the handler
 // can return immediately. This keeps a missing/unreachable config from taking
@@ -589,15 +613,23 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		return
 	}
 
-	ipDigit, err := GetLastIPDigit(req.IP)
+	ipDigit, err := hostDigit(req.IP, networkKey)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
 
 	req.CreateDNS = wantsDNS(req.CreateDNS, req.Status)
 
-	entry := ipList[networkKey][ipDigit]
+	// assign overwrites by design (the Crossplane provider relies on it), but
+	// never silently: the previous holder is reported and its record withdrawn.
+	// Claiming an address only if it is free is reserve with "ip" (issue #201).
+	entry, inPool := ipList[networkKey][ipDigit]
+	previous := entry
+	if !isFree(previous) {
+		log.Printf("ASSIGN OVERWRITES %s.%s: was %s/%s, now %s", networkKey, ipDigit, previous.Cluster, previous.Status, req.Cluster)
+	}
+
 	entry.Status = req.Status
 	if req.CreateDNS {
 		entry.Status = withDNSSuffix(req.Status)
@@ -614,15 +646,30 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		return
 	}
 
+	// Same rule as edit: withdraw the old record when DNS is turned off or the
+	// address changes hands, otherwise it keeps resolving to an address that is
+	// no longer that cluster's.
 	var dns dnsResult
+	hadDNS := strings.HasSuffix(previous.Status, ":DNS") && previous.Cluster != ""
+	if hadDNS && (!req.CreateDNS || previous.Cluster != req.Cluster) {
+		dns.remove(pdns, ddwrt, previous.Cluster)
+	}
 	if req.CreateDNS {
 		dns.create(pdns, ddwrt, req.Cluster, networkKey+"."+ipDigit)
 	}
 
-	writeJSON(w, dns.annotate(map[string]any{
+	resp := map[string]any{
 		"status":  "ok",
-		"message": fmt.Sprintf("IP %s assigned to cluster %s", req.IP, req.Cluster),
-	}))
+		"message": fmt.Sprintf("IP %s assigned to cluster %s", networkKey+"."+ipDigit, req.Cluster),
+	}
+	if !isFree(previous) {
+		resp["previous_cluster"] = previous.Cluster
+		resp["previous_status"] = previous.Status
+	}
+	if !inPool {
+		resp["added_to_pool"] = true
+	}
+	writeJSON(w, dns.annotate(resp))
 }
 
 // handleAPIReserve finds an available IP in the network, assigns it to the cluster, and returns the full IP.
@@ -635,6 +682,11 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		CreateDNS            bool   `json:"create_dns"`
 		CreateDNSAlt         bool   `json:"createDNS"`
 		LeaseDurationSeconds int64  `json:"lease_duration_seconds"`
+		// IP asks for one specific address instead of any free one (issue #201).
+		// Unlike assign it never overwrites: a taken address answers 409.
+		IP string `json:"ip"`
+		// AddToPool lets IP name a host part the pool does not list yet.
+		AddToPool bool `json:"add_to_pool"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -669,18 +721,50 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		return
 	}
 
-	// Find an available IP
 	var foundDigit string
-	for digit, info := range networkIPs {
-		if isFree(info) {
-			foundDigit = digit
-			break
-		}
-	}
+	addedToPool := false
 
-	if foundDigit == "" {
-		http.Error(w, `{"error":"no available IPs in network"}`, http.StatusConflict)
-		return
+	if req.IP != "" {
+		// A specific address: it must belong here, exist (or be added on
+		// request) and be free — checked inside the ledger write, so the answer
+		// cannot go stale before the save.
+		digit, err := hostDigit(req.IP, networkKey)
+		if err != nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+
+		current, inPool := networkIPs[digit]
+		switch {
+		case !inPool && !req.AddToPool:
+			writeJSONStatus(w, http.StatusNotFound, map[string]any{
+				"error": fmt.Sprintf("ip %s.%s is not in the pool; set add_to_pool to add it", networkKey, digit),
+			})
+			return
+		case inPool && !isFree(current):
+			writeJSONStatus(w, http.StatusConflict, map[string]any{
+				"error":   fmt.Sprintf("ip %s.%s is not free", networkKey, digit),
+				"ip":      networkKey + "." + digit,
+				"cluster": current.Cluster,
+				"status":  current.Status,
+			})
+			return
+		}
+		foundDigit = digit
+		addedToPool = !inPool
+	} else {
+		// Find an available IP
+		for digit, info := range networkIPs {
+			if isFree(info) {
+				foundDigit = digit
+				break
+			}
+		}
+
+		if foundDigit == "" {
+			http.Error(w, `{"error":"no available IPs in network"}`, http.StatusConflict)
+			return
+		}
 	}
 
 	fullIP := networkKey + "." + foundDigit
@@ -710,13 +794,17 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		dns.create(pdns, ddwrt, req.Cluster, fullIP)
 	}
 
-	writeJSON(w, dns.annotate(map[string]any{
+	resp := map[string]any{
 		"ip":      fullIP,
 		"ips":     []string{fullIP},
 		"digit":   foundDigit,
 		"status":  entry.Status,
 		"cluster": req.Cluster,
-	}))
+	}
+	if addedToPool {
+		resp["added_to_pool"] = true
+	}
+	writeJSON(w, dns.annotate(resp))
 }
 
 func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {

@@ -148,6 +148,28 @@ curl -X POST http://localhost:8080/api/v1/networks/10.31.103/reserve \
 # → {"ip":"10.31.103.6","digit":"6","status":"ASSIGNED","cluster":"my-cluster"}
 ```
 
+### Reserve a specific IP
+
+Pass `ip` to claim one address only if it is free. Unlike `/assign`, this never
+overwrites:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/networks/10.31.103/reserve \
+  -H "Content-Type: application/json" \
+  -d '{"cluster": "my-cluster", "ip": "10.31.103.230"}'
+```
+
+| Answer | When |
+|--------|------|
+| `200` | The address was free and is now reserved |
+| `409` | Taken — the body names the current `cluster` and `status` |
+| `404` | Not in the pool; add `"add_to_pool": true` to record it anyway |
+| `400` | `ip` is not in network `{key}` |
+
+`/assign` keeps overwriting whatever holds the address, but reports
+`previous_cluster`/`previous_status` and withdraws that cluster's DNS record. It
+rejects an `ip` outside `{key}`.
+
 ### Assign with a lease (auto-reclaim after TTL)
 
 ```bash
