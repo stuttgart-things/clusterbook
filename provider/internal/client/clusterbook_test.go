@@ -392,3 +392,76 @@ func TestRenewLease(t *testing.T) {
 		t.Errorf("expected lease_duration_seconds 3600, got %v", got["lease_duration_seconds"])
 	}
 }
+
+func TestReserveIP(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/networks/10.31.103/reserve" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		var req map[string]interface{}
+		decodeBody(t, r, &req)
+		if _, present := req["ip"]; present {
+			t.Errorf("ReserveIP must let the server pick, but sent ip %v", req["ip"])
+		}
+		if req["cluster"] != "mycluster" || req["status"] != "ASSIGNED" || req["create_dns"] != true {
+			t.Errorf("unexpected body: %v", req)
+		}
+		if req["lease_duration_seconds"] != float64(3600) {
+			t.Errorf("expected lease 3600, got %v", req["lease_duration_seconds"])
+		}
+		encodeJSON(t, w, map[string]interface{}{"ip": "10.31.103.7", "digit": "7", "dns": "ok"})
+	}))
+	defer srv.Close()
+
+	ip, err := NewClient(srv.URL).ReserveIP("10.31.103", "mycluster", "ASSIGNED", true, 3600)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ip != "10.31.103.7" {
+		t.Errorf("ip = %q, want 10.31.103.7", ip)
+	}
+}
+
+func TestReserveIP_NoFreeAddress(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":"no available IPs in network"}`, http.StatusConflict)
+	}))
+	defer srv.Close()
+
+	ip, err := NewClient(srv.URL).ReserveIP("10.31.103", "mycluster", "ASSIGNED", false, 0)
+	if err == nil || !strings.Contains(err.Error(), "409") {
+		t.Fatalf("expected a 409 error, got ip %q err %v", ip, err)
+	}
+	if ip != "" {
+		t.Errorf("no address may be returned on 409, got %q", ip)
+	}
+}
+
+// The reservation is saved even when DNS fails, so the caller needs the address
+// alongside the error.
+func TestReserveIP_DNSFailureReturnsAddress(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		encodeJSON(t, w, map[string]string{"ip": "10.31.103.7", "dns": "failed", "dns_error": "router unreachable"})
+	}))
+	defer srv.Close()
+
+	ip, err := NewClient(srv.URL).ReserveIP("10.31.103", "mycluster", "ASSIGNED", true, 0)
+	var dnsErr *DNSError
+	if !errors.As(err, &dnsErr) {
+		t.Fatalf("expected a *DNSError, got %T: %v", err, err)
+	}
+	if ip != "10.31.103.7" {
+		t.Errorf("ip = %q, want the reserved address alongside the DNS error", ip)
+	}
+}
+
+func TestReserveIP_ResponseWithoutIP(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		encodeJSON(t, w, map[string]string{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	if _, err := NewClient(srv.URL).ReserveIP("10.31.103", "mycluster", "ASSIGNED", false, 0); err == nil {
+		t.Fatal("a 200 without an ip must not pass as a reservation")
+	}
+}
