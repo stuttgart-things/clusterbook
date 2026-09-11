@@ -1,3 +1,10 @@
+## [1.26.3](https://github.com/stuttgart-things/clusterbook/compare/v1.26.2...v1.26.3) (2026-09-11)
+
+
+### Bug Fixes
+
+* fail requests whose ledger save failed, before touching DNS ([#202](https://github.com/stuttgart-things/clusterbook/issues/202)) ([6157ab3](https://github.com/stuttgart-things/clusterbook/commit/6157ab36cc4c0c2046eb914c3b04c6700838cfb9)), closes [#200](https://github.com/stuttgart-things/clusterbook/issues/200)
+
 ## [1.26.2](https://github.com/stuttgart-things/clusterbook/compare/v1.26.1...v1.26.2) (2026-09-11)
 
 
