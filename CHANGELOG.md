@@ -1,3 +1,11 @@
+## [1.26.2](https://github.com/stuttgart-things/clusterbook/compare/v1.26.1...v1.26.2) (2026-09-11)
+
+
+### Bug Fixes
+
+* **deps:** update golang.org/x/crypto and kubernetes monorepo ([3984b62](https://github.com/stuttgart-things/clusterbook/commit/3984b62da3ceb48d612c4bdd1e7bd4a14709e41b)), closes [#195](https://github.com/stuttgart-things/clusterbook/issues/195) [#195](https://github.com/stuttgart-things/clusterbook/issues/195) [#191](https://github.com/stuttgart-things/clusterbook/issues/191)
+* reject unknown networks in SetClusterInfo instead of panicking ([7adca72](https://github.com/stuttgart-things/clusterbook/commit/7adca72217dea307175d058c67269f967e215245))
+
 ## [1.26.1](https://github.com/stuttgart-things/clusterbook/compare/v1.26.0...v1.26.1) (2026-09-11)
 
 
