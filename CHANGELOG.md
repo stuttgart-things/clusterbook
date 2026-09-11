@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/stuttgart-things/clusterbook/compare/v1.27.0...v1.28.0) (2026-09-11)
+
+
+### Features
+
+* reserve a specific IP without overwriting, and harden assign ([#204](https://github.com/stuttgart-things/clusterbook/issues/204)) ([0403ef7](https://github.com/stuttgart-things/clusterbook/commit/0403ef75db2719d555d5fb35a44438239310afcb)), closes [#201](https://github.com/stuttgart-things/clusterbook/issues/201)
+
 # [1.27.0](https://github.com/stuttgart-things/clusterbook/compare/v1.26.3...v1.27.0) (2026-09-11)
 
 
