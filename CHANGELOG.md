@@ -1,3 +1,10 @@
+# [1.27.0](https://github.com/stuttgart-things/clusterbook/compare/v1.26.3...v1.27.0) (2026-09-11)
+
+
+### Features
+
+* serialize ledger writes, conditional cr saves, ReserveIpAddresses RPC ([#203](https://github.com/stuttgart-things/clusterbook/issues/203)) ([922b2d8](https://github.com/stuttgart-things/clusterbook/commit/922b2d873c5667a7e0cdd1bf9514262643e37f7e)), closes [#199](https://github.com/stuttgart-things/clusterbook/issues/199)
+
 ## [1.26.3](https://github.com/stuttgart-things/clusterbook/compare/v1.26.2...v1.26.3) (2026-09-11)
 
 
