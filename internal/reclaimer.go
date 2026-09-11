@@ -75,8 +75,13 @@ func removeReclaimedDNS(reclaimed []ExpiredLease, pdns *PDNSClient, ddwrt *DDWRT
 
 // reclaimOnce runs one reclaimer cycle: load, clear expired leases, save, and only
 // then remove their DNS records. When the save fails nothing counts as reclaimed.
+// The whole cycle is one ledger write, so no reservation can interleave with it
+// (issue #199); a conflict is simply retried on the next tick.
 func reclaimOnce(loadFrom, configLoc, configNm string, now time.Time, pdns *PDNSClient, ddwrt *DDWRTClient) ([]ExpiredLease, error) {
-	ipList, err := LoadProfile(loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, err := tx.Load()
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +91,7 @@ func reclaimOnce(loadFrom, configLoc, configNm string, now time.Time, pdns *PDNS
 		return nil, nil
 	}
 
-	if err := SaveConfig(ipList, loadFrom, configLoc, configNm); err != nil {
+	if err := tx.Save(ipList); err != nil {
 		return nil, err
 	}
 

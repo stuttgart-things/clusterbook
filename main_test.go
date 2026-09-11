@@ -6,10 +6,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stuttgart-things/clusterbook/internal"
@@ -208,5 +211,111 @@ func TestSetClusterInfo_SaveFailureReturnsInternal(t *testing.T) {
 		&ipservice.ClusterRequest{IpAddressRange: "10.31.103.6", ClusterName: "probe", Status: "ASSIGNED"})
 	if got := status.Code(err); got != codes.Internal {
 		t.Fatalf("code = %v (resp %v, err %v), want Internal", got, resp, err)
+	}
+}
+
+const grpcPoolYAML = `
+10.31.103:
+  "5":
+    status: "ASSIGNED:DNS"
+    cluster: mycluster
+  "6":
+    status: ""
+    cluster: ""
+  "7":
+    status: ""
+    cluster: ""
+  "8":
+    status: ""
+    cluster: ""
+`
+
+// Issue #199: GetIpAddressRange + SetClusterInfo is two calls with nothing held in
+// between. ReserveIpAddresses records what it hands out in the same write.
+func TestReserveIpAddresses_RecordsWhatItReturns(t *testing.T) {
+	useDiskConfig(t, grpcPoolYAML)
+	srv := &server{}
+
+	resp, err := srv.ReserveIpAddresses(context.Background(),
+		&ipservice.ReserveRequest{CountIpAddresses: 2, NetworkKey: "10.31.103", ClusterName: "grpc-a"})
+	if err != nil {
+		t.Fatalf("ReserveIpAddresses: %v", err)
+	}
+	ips := strings.Split(resp.IpAddressRange, ";")
+	if len(ips) != 2 {
+		t.Fatalf("IpAddressRange = %q, want 2 addresses", resp.IpAddressRange)
+	}
+
+	ipList, err := internal.LoadProfile(loadConfigFrom, configLocation, configName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ip := range ips {
+		digit := ip[strings.LastIndex(ip, ".")+1:]
+		if got := ipList["10.31.103"][digit]; got.Status != "ASSIGNED" || got.Cluster != "grpc-a" {
+			t.Errorf("%s in ledger = %+v, want ASSIGNED/grpc-a", ip, got)
+		}
+	}
+
+	// One address is left; asking for two must not hand out the recorded ones.
+	if _, err := srv.ReserveIpAddresses(context.Background(),
+		&ipservice.ReserveRequest{CountIpAddresses: 2, NetworkKey: "10.31.103", ClusterName: "grpc-b"}); status.Code(err) != codes.ResourceExhausted {
+		t.Errorf("second reserve: code = %v, want ResourceExhausted", status.Code(err))
+	}
+}
+
+func TestReserveIpAddresses_Concurrent(t *testing.T) {
+	useDiskConfig(t, grpcPoolYAML)
+	srv := &server{}
+
+	const n = 3 // exactly the free addresses
+	got := make([]string, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			resp, err := srv.ReserveIpAddresses(context.Background(),
+				&ipservice.ReserveRequest{CountIpAddresses: 1, NetworkKey: "10.31.103", ClusterName: fmt.Sprintf("c%d", i)})
+			if err != nil {
+				t.Errorf("reserve %d: %v", i, err)
+				return
+			}
+			got[i] = resp.IpAddressRange
+		}(i)
+	}
+	wg.Wait()
+
+	seen := map[string]bool{}
+	for _, ip := range got {
+		if ip != "" && seen[ip] {
+			t.Errorf("%s handed out twice: %v", ip, got)
+		}
+		seen[ip] = true
+	}
+}
+
+func TestReserveIpAddresses_RejectsBadRequests(t *testing.T) {
+	useDiskConfig(t, grpcPoolYAML)
+
+	tests := []struct {
+		name string
+		req  *ipservice.ReserveRequest
+		want codes.Code
+	}{
+		{"no cluster", &ipservice.ReserveRequest{CountIpAddresses: 1, NetworkKey: "10.31.103"}, codes.InvalidArgument},
+		{"zero count", &ipservice.ReserveRequest{NetworkKey: "10.31.103", ClusterName: "c"}, codes.InvalidArgument},
+		{"dns status without a record", &ipservice.ReserveRequest{CountIpAddresses: 1, NetworkKey: "10.31.103", ClusterName: "c", Status: "ASSIGNED:DNS"}, codes.InvalidArgument},
+		{"unknown network", &ipservice.ReserveRequest{CountIpAddresses: 1, NetworkKey: "10.99.99", ClusterName: "c"}, codes.NotFound},
+		{"too many", &ipservice.ReserveRequest{CountIpAddresses: 4, NetworkKey: "10.31.103", ClusterName: "c"}, codes.ResourceExhausted},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := (&server{}).ReserveIpAddresses(context.Background(), tt.req)
+			if got := status.Code(err); got != tt.want {
+				t.Errorf("code = %v (err %v), want %v", got, err, tt.want)
+			}
+		})
 	}
 }

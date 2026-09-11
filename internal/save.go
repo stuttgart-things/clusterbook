@@ -17,19 +17,22 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// SaveConfig persists the IP list to the configured backend. Callers must not
-// report success, or touch DNS, when it fails (issue #200).
-func SaveConfig(ipList map[string]IPs, source, configLocation, configName string) error {
+// saveConfig persists the IP list to the configured backend and returns the new
+// version. Callers must not report success, or touch DNS, when it fails (issue
+// #200). It is reached only through LedgerWrite.Save, which holds the write lock
+// and supplies the version it loaded (issue #199).
+func saveConfig(ipList map[string]IPs, source, configLocation, configName, loadedVersion string) (string, error) {
 	switch source {
 	case "disk":
-		return SaveYAMLToDisk(ipList, configLocation+"/"+configName)
+		return "", SaveYAMLToDisk(ipList, configLocation+"/"+configName)
 	case "cr":
-		if err := CreateOrUpdateNetworkConfig(ConvertToCRFormat(ipList), configName, configLocation); err != nil {
-			return fmt.Errorf("save config: networkconfig %q in namespace %q: %w", configName, configLocation, err)
+		version, err := CreateOrUpdateNetworkConfig(ConvertToCRFormat(ipList), configName, configLocation, loadedVersion)
+		if err != nil {
+			return "", fmt.Errorf("save config: networkconfig %q in namespace %q: %w", configName, configLocation, err)
 		}
-		return nil
+		return version, nil
 	default:
-		return fmt.Errorf("save config: invalid LOAD_CONFIG_FROM value: %q", source)
+		return "", fmt.Errorf("save config: invalid LOAD_CONFIG_FROM value: %q", source)
 	}
 }
 
@@ -76,7 +79,15 @@ func SaveYAMLToDisk(ipList map[string]IPs, filename string) error {
 	return nil
 }
 
-func CreateOrUpdateNetworkConfig(info map[string][]string, resourceName, namespace string) error {
+// CreateOrUpdateNetworkConfig writes the NetworkConfig only if it is still at
+// expectedVersion — the resourceVersion the caller loaded, or "" when it loaded a
+// CR that did not exist. Otherwise it returns ErrLedgerConflict. It returns the
+// resourceVersion after the write.
+//
+// Before issue #199 it fetched the object again right before updating and copied
+// that fresh resourceVersion, so the apiserver's own conflict check always passed
+// and the last writer silently won.
+func CreateOrUpdateNetworkConfig(info map[string][]string, resourceName, namespace, expectedVersion string) (string, error) {
 	networkConfig := &NetworkConfig{
 		TypeMeta: v1.TypeMeta{
 			APIVersion: groupVersion.String(),
@@ -92,37 +103,57 @@ func CreateOrUpdateNetworkConfig(info map[string][]string, resourceName, namespa
 	}
 
 	// CREATE A DYNAMIC CLIENT
-	dynClient, err := CreateDynamicKubeConfigClient()
+	dynClient, err := newDynamicClient()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// CONVERT THE NETWORKCONFIG STRUCT TO AN UNSTRUCTURED FORMAT
 	unstructuredConfig, err := runtime.DefaultUnstructuredConverter.ToUnstructured(networkConfig)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// SET THE GROUP VERSION RESOURCE
 	resourceClient := dynClient.Resource(groupVersion.WithResource(resource)).Namespace(namespace)
 
-	// TRY TO UPDATE THE RESOURCE IF IT ALREADY EXISTS
 	existingResource, err := resourceClient.Get(context.TODO(), networkConfig.Name, v1.GetOptions{})
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// If not found, create a new one
-			_, err = resourceClient.Create(context.TODO(), &unstructured.Unstructured{
-				Object: unstructuredConfig,
-			}, v1.CreateOptions{})
-			return err
+		if !errors.IsNotFound(err) {
+			return "", err
 		}
-		return err // Handle other errors
+		if expectedVersion != "" {
+			return "", fmt.Errorf("%w: deleted since it was loaded at resourceVersion %s", ErrLedgerConflict, expectedVersion)
+		}
+
+		// NOT FOUND AND NONE WAS LOADED: CREATE
+		created, err := resourceClient.Create(context.TODO(), &unstructured.Unstructured{
+			Object: unstructuredConfig,
+		}, v1.CreateOptions{})
+		if errors.IsAlreadyExists(err) {
+			return "", fmt.Errorf("%w: created by another writer", ErrLedgerConflict)
+		}
+		if err != nil {
+			return "", err
+		}
+		return created.GetResourceVersion(), nil
 	}
 
-	// IF IT EXISTS, UPDATE THE RESOURCE
-	unstructuredConfig["metadata"] = existingResource.Object["metadata"] // Retain the existing metadata (e.g., UID, resource version)
-	_, err = resourceClient.Update(context.TODO(), &unstructured.Unstructured{
+	if current := existingResource.GetResourceVersion(); current != expectedVersion {
+		return "", fmt.Errorf("%w: resourceVersion is %s, loaded %q", ErrLedgerConflict, current, expectedVersion)
+	}
+
+	// UPDATE, KEEPING THE EXISTING METADATA (LABELS, OWNERS, AND THE LOADED
+	// RESOURCEVERSION, SO A WRITE SINCE THE GET ABOVE STILL FAILS WITH 409)
+	unstructuredConfig["metadata"] = existingResource.Object["metadata"]
+	updated, err := resourceClient.Update(context.TODO(), &unstructured.Unstructured{
 		Object: unstructuredConfig,
 	}, v1.UpdateOptions{})
-	return err
+	if errors.IsConflict(err) {
+		return "", fmt.Errorf("%w: %v", ErrLedgerConflict, err)
+	}
+	if err != nil {
+		return "", err
+	}
+	return updated.GetResourceVersion(), nil
 }

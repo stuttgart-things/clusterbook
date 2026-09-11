@@ -6,6 +6,7 @@ package internal
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -413,7 +414,10 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -440,7 +444,7 @@ func handleHTMXAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	entry.Cluster = cluster
 	ipList[ipKey][ipDigit] = entry
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -464,7 +468,10 @@ func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	ip := r.FormValue("ip")
 	networkKey := r.FormValue("network_key")
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -488,7 +495,7 @@ func handleHTMXRelease(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	entry.Cluster = ""
 	ipList[ipKey][ipDigit] = entry
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -569,7 +576,10 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		req.Status = "ASSIGNED"
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -600,7 +610,7 @@ func handleAPIAssign(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	}
 	ipList[networkKey][ipDigit] = entry
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -645,7 +655,10 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		req.Status = "ASSIGNED"
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -688,7 +701,7 @@ func handleAPIReserve(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	}
 	ipList[networkKey][foundDigit] = entry
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -718,7 +731,10 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -742,7 +758,7 @@ func handleAPIRelease(w http.ResponseWriter, r *http.Request, loadFrom, configLo
 	entry.LeaseExpiresAt = 0
 	ipList[networkKey][ipDigit] = entry
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -775,7 +791,10 @@ func handleAPIRenewLease(w http.ResponseWriter, r *http.Request, loadFrom, confi
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -804,7 +823,7 @@ func handleAPIRenewLease(w http.ResponseWriter, r *http.Request, loadFrom, confi
 	entry.LeaseExpiresAt = time.Now().Unix() + req.LeaseDurationSeconds
 	ipList[networkKey][ipDigit] = entry
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -830,7 +849,10 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -861,7 +883,7 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 			totalIPs += len(octets)
 		}
 
-		if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+		if !saveConfigHTTP(w, tx, ipList) {
 			return
 		}
 
@@ -889,7 +911,7 @@ func handleAPICreateNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 		ipList[req.Network][ip] = IPInfo{}
 	}
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -921,7 +943,10 @@ func handleAPICreateNetworkFromCIDR(w http.ResponseWriter, r *http.Request, load
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -944,7 +969,7 @@ func handleAPICreateNetworkFromCIDR(w http.ResponseWriter, r *http.Request, load
 		totalIPs += len(octets)
 	}
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -957,7 +982,10 @@ func handleAPICreateNetworkFromCIDR(w http.ResponseWriter, r *http.Request, load
 
 func handleAPIDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, configLoc, configNm string) {
 	networkKey := r.PathValue("key")
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -968,7 +996,7 @@ func handleAPIDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, co
 	}
 
 	delete(ipList, networkKey)
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -995,7 +1023,10 @@ func handleAPIAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -1013,7 +1044,7 @@ func handleAPIAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 		}
 	}
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -1031,7 +1062,10 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 		ip = strings.TrimPrefix(ip, networkKey+".")
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -1053,7 +1087,7 @@ func handleAPIDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, configL
 	prevCluster := entry.Cluster
 
 	delete(ipList[networkKey], ip)
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -1098,7 +1132,10 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -1128,7 +1165,7 @@ func handleAPIEditIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	entry.Cluster = req.Cluster
 	ipList[networkKey][ipDigit] = entry
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -1290,7 +1327,10 @@ func handleHTMXAddNetwork(w http.ResponseWriter, r *http.Request, loadFrom, conf
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -1305,7 +1345,7 @@ func handleHTMXAddNetwork(w http.ResponseWriter, r *http.Request, loadFrom, conf
 		ipList[network][strconv.Itoa(i)] = IPInfo{}
 	}
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -1328,7 +1368,10 @@ func handleHTMXAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -1344,7 +1387,7 @@ func handleHTMXAddIP(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	}
 
 	ipList[networkKey][ip] = IPInfo{}
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -1367,7 +1410,10 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -1384,7 +1430,7 @@ func handleHTMXDeleteIP(w http.ResponseWriter, r *http.Request, loadFrom, config
 	prevCluster := entry.Cluster
 
 	delete(ipList[networkKey], ipDigit)
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -1415,7 +1461,10 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 		return
 	}
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
@@ -1446,7 +1495,7 @@ func handleHTMXEdit(w http.ResponseWriter, r *http.Request, loadFrom, configLoc,
 	entry.Cluster = cluster
 	ipList[ipKey][ipDigit] = entry
 
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -1518,12 +1567,15 @@ func handleHTMXDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, c
 
 	networkKey := r.FormValue("network_key")
 
-	ipList, ok := loadProfileHTTP(w, loadFrom, configLoc, configNm)
+	tx := BeginLedgerWrite(loadFrom, configLoc, configNm)
+	defer tx.End()
+
+	ipList, ok := loadForWriteHTTP(w, tx)
 	if !ok {
 		return
 	}
 	delete(ipList, networkKey)
-	if !saveConfigHTTP(w, ipList, loadFrom, configLoc, configNm) {
+	if !saveConfigHTTP(w, tx, ipList) {
 		return
 	}
 
@@ -1532,17 +1584,36 @@ func handleHTMXDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, c
 	w.WriteHeader(http.StatusOK)
 }
 
-// saveConfigHTTP persists the IP list for an HTTP request, the write-side twin of
-// loadProfileHTTP. On failure it logs, writes a 500 and returns false; the handler
-// must return immediately — before any DNS call, so a record is never created or
-// removed for a change the ledger does not hold (issue #200).
-func saveConfigHTTP(w http.ResponseWriter, ipList map[string]IPs, loadFrom, configLoc, configNm string) bool {
-	if err := SaveConfig(ipList, loadFrom, configLoc, configNm); err != nil {
+// loadForWriteHTTP loads the ledger inside a write, the write-side twin of
+// loadProfileHTTP.
+func loadForWriteHTTP(w http.ResponseWriter, tx *LedgerWrite) (map[string]IPs, bool) {
+	ipList, err := tx.Load()
+	if err != nil {
+		log.Printf("FAILED TO LOAD NETWORK CONFIG: %v", err)
+		http.Error(w, "failed to load network config", http.StatusInternalServerError)
+		return nil, false
+	}
+	return ipList, true
+}
+
+// saveConfigHTTP persists the IP list for an HTTP request. On failure it logs,
+// writes the error and returns false; the handler must return immediately —
+// before any DNS call, so a record is never created or removed for a change the
+// ledger does not hold (issue #200). A concurrent change answers 409 so the
+// caller can retry (issue #199).
+func saveConfigHTTP(w http.ResponseWriter, tx *LedgerWrite, ipList map[string]IPs) bool {
+	err := tx.Save(ipList)
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, ErrLedgerConflict):
+		log.Printf("NETWORK CONFIG CHANGED CONCURRENTLY: %v", err)
+		http.Error(w, "network config changed concurrently, retry the request", http.StatusConflict)
+	default:
 		log.Printf("FAILED TO SAVE NETWORK CONFIG: %v", err)
 		http.Error(w, "failed to save network config", http.StatusInternalServerError)
-		return false
 	}
-	return true
+	return false
 }
 
 // --- HTML Templates ---

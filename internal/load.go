@@ -43,15 +43,24 @@ func ReadYAMLFileFromDisk(filePath string) ([]byte, error) {
 // handlers, gRPC handlers, and the background reclaimer — can fail a single
 // operation gracefully rather than crashing the whole server (and its readiness
 // probe) when the config is temporarily missing or unreachable.
+//
+// It is for reading. A change must go through BeginLedgerWrite (issue #199).
 func LoadProfile(source, configLocation, configName string) (map[string]IPs, error) {
+	ipList, _, err := loadProfileVersioned(source, configLocation, configName)
+	return ipList, err
+}
+
+// loadProfileVersioned also returns the version a conditional save needs: the
+// CR's resourceVersion, "" for a CR that does not exist yet, and "" for disk.
+func loadProfileVersioned(source, configLocation, configName string) (map[string]IPs, string, error) {
 	switch source {
 	// READ NetworkConfig FROM DISK
 	case "disk":
 		yamlData, err := ReadYAMLFileFromDisk(configLocation + "/" + configName)
 		if err != nil {
-			return nil, fmt.Errorf("load profile: read yaml from disk %q: %w", configLocation+"/"+configName, err)
+			return nil, "", fmt.Errorf("load profile: read yaml from disk %q: %w", configLocation+"/"+configName, err)
 		}
-		return LoadYAMLStructure(yamlData), nil
+		return LoadYAMLStructure(yamlData), "", nil
 
 	// READ NetworkConfig FROM CR
 	case "cr":
@@ -65,21 +74,21 @@ func LoadProfile(source, configLocation, configName string) (map[string]IPs, err
 					"NetworkConfig not found, starting with empty config (will be created on first write)",
 					pterm.DefaultLogger.Args("name", configName, "namespace", configLocation),
 				)
-				return map[string]IPs{}, nil
+				return map[string]IPs{}, "", nil
 			}
-			return nil, fmt.Errorf("load profile: get networkconfig %q in namespace %q: %w", configName, configLocation, err)
+			return nil, "", fmt.Errorf("load profile: get networkconfig %q in namespace %q: %w", configName, configLocation, err)
 		}
-		return ConvertFromCRFormat(retrievedConfig.Spec.Networks), nil
+		return ConvertFromCRFormat(retrievedConfig.Spec.Networks), retrievedConfig.ResourceVersion, nil
 
 	default:
-		return nil, fmt.Errorf("load profile: invalid LOAD_CONFIG_FROM value: %q", source)
+		return nil, "", fmt.Errorf("load profile: invalid LOAD_CONFIG_FROM value: %q", source)
 	}
 }
 
 // FUNCTION TO GET A NETWORKCONFIG RESOURCE
 func GetNetworkConfig(resourceName, namespace string) (*NetworkConfig, error) {
 	// CREATE A DYNAMIC CLIENT
-	dynClient, err := CreateDynamicKubeConfigClient()
+	dynClient, err := newDynamicClient()
 	if err != nil {
 		return nil, err
 	}

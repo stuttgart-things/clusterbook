@@ -211,7 +211,9 @@ and delete) reports what happened to the record:
 | `skipped` | No DNS work was requested |
 
 The IP operation itself is persisted either way, so the status code stays `200`
-and the DNS verdict lives in the body. An automated caller should check it:
+and the DNS verdict lives in the body. If the ledger could not be saved, the
+request fails instead — `500`, or `409` when another writer changed the config
+concurrently (retry) — and no DNS record is touched. An automated caller should check it:
 
 ```json
 {
@@ -231,14 +233,25 @@ marker is never appended twice.
 <details><summary>gRPC</summary>
 
 ```bash
-# Get available IPs
-grpcurl -plaintext localhost:50051 ipservice.IpService/GetIpAddressRange \
-  -d '{"countIpAddresses": 2, "networkKey": "10.31.103"}'
+# Reserve IPs for a cluster — picks and records them in one step
+grpcurl -plaintext localhost:50051 ipservice.IpService/ReserveIpAddresses \
+  -d '{"countIpAddresses": 2, "networkKey": "10.31.103", "clusterName": "my-cluster"}'
 
-# Assign IPs to a cluster
+# Assign specific IPs to a cluster
 grpcurl -plaintext localhost:50051 ipservice.IpService/SetClusterInfo \
   -d '{"ipAddressRange": "10.31.103.6", "clusterName": "my-cluster", "status": "ASSIGNED"}'
+
+# Preview free IPs — does NOT reserve them
+grpcurl -plaintext localhost:50051 ipservice.IpService/GetIpAddressRange \
+  -d '{"countIpAddresses": 2, "networkKey": "10.31.103"}'
 ```
+
+`GetIpAddressRange` only reads: two callers can receive the same addresses, and
+nothing is recorded until `SetClusterInfo`. Use `ReserveIpAddresses` to allocate.
+DNS records are managed over HTTP only, so a `:DNS` status is rejected here.
+
+A write that loses a race against another replica (cr mode) returns `ABORTED`;
+retry the call.
 
 </details>
 

@@ -78,17 +78,8 @@ func (s *server) GetIpAddressRange(ctx context.Context, req *ipservice.IpRequest
 
 	availableAddresses, err := internal.GenerateIPs(ipList, int(req.CountIpAddresses), req.NetworkKey)
 	if err != nil {
-		// A too-small pool or an unknown network is an answer to this request,
-		// not a reason to stop the server for every other caller.
 		logger.Error("FAILED TO GENERATE IPS", logger.Args("network", req.NetworkKey, "err", err.Error()))
-		switch {
-		case errors.Is(err, internal.ErrNetworkNotFound):
-			return nil, status.Error(codes.NotFound, err.Error())
-		case errors.Is(err, internal.ErrNotEnoughAddresses):
-			return nil, status.Error(codes.ResourceExhausted, err.Error())
-		default:
-			return nil, status.Error(codes.Internal, err.Error())
-		}
+		return nil, generateIPsStatus(err)
 	}
 
 	logger.Info("AVAILABLE ADDRESSES", logger.Args("", availableAddresses))
@@ -104,11 +95,14 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	logger.Info("LOAD CONFIG FROM", logger.Args("", loadConfigFrom))
 	logger.Info("CONFIG FILE PATH", logger.Args("", configLocation+"/"+configName))
 
-	// LOAD EXISTING YAML FILE
-	ipList, err := internal.LoadProfile(loadConfigFrom, configLocation, configName)
+	// LOAD EXISTING CONFIG — as one ledger write, so no other writer interleaves (issue #199)
+	tx := internal.BeginLedgerWrite(loadConfigFrom, configLocation, configName)
+	defer tx.End()
+
+	ipList, err := tx.Load()
 	if err != nil {
 		logger.Error("FAILED TO LOAD CONFIG", logger.Args("err", err.Error()))
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	// GET IPS FROM REQUEST
@@ -152,12 +146,88 @@ func (s *server) SetClusterInfo(ctx context.Context, req *ipservice.ClusterReque
 	result = strings.ToUpper(result)
 
 	// SAVE — a failed write must not be reported as a success (issue #200)
-	if err := internal.SaveConfig(ipList, loadConfigFrom, configLocation, configName); err != nil {
+	if err := tx.Save(ipList); err != nil {
 		logger.Error("FAILED TO SAVE CONFIG", logger.Args("err", err.Error()))
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, saveStatus(err)
 	}
 
 	return &ipservice.ClusterResponse{Status: result}, nil
+}
+
+// ReserveIpAddresses picks free addresses and records them in one ledger write.
+// GetIpAddressRange followed by SetClusterInfo is two calls with nothing held in
+// between, so concurrent callers received the same addresses (issue #199).
+func (s *server) ReserveIpAddresses(ctx context.Context, req *ipservice.ReserveRequest) (*ipservice.IpResponse, error) {
+	if req.ClusterName == "" {
+		return nil, status.Error(codes.InvalidArgument, "clusterName is required")
+	}
+	if req.CountIpAddresses < 1 {
+		return nil, status.Error(codes.InvalidArgument, "countIpAddresses must be at least 1")
+	}
+
+	entryStatus := req.Status
+	if entryStatus == "" {
+		entryStatus = "ASSIGNED"
+	}
+	if strings.HasSuffix(entryStatus, ":DNS") {
+		// A ":DNS" status without a record would claim something untrue.
+		return nil, status.Error(codes.InvalidArgument, "DNS records are not managed over gRPC; reserve over HTTP with create_dns")
+	}
+
+	tx := internal.BeginLedgerWrite(loadConfigFrom, configLocation, configName)
+	defer tx.End()
+
+	ipList, err := tx.Load()
+	if err != nil {
+		logger.Error("FAILED TO LOAD CONFIG", logger.Args("err", err.Error()))
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	picked, err := internal.GenerateIPs(ipList, int(req.CountIpAddresses), req.NetworkKey)
+	if err != nil {
+		return nil, generateIPsStatus(err)
+	}
+	if len(picked) == 0 {
+		return nil, status.Error(codes.ResourceExhausted, internal.ErrNotEnoughAddresses.Error())
+	}
+
+	for _, ip := range picked {
+		digit, err := internal.GetLastIPDigit(ip)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		ipList[req.NetworkKey][digit] = internal.IPInfo{Status: entryStatus, Cluster: req.ClusterName}
+	}
+
+	if err := tx.Save(ipList); err != nil {
+		logger.Error("FAILED TO SAVE CONFIG", logger.Args("err", err.Error()))
+		return nil, saveStatus(err)
+	}
+
+	logger.Info("RESERVED IPS", logger.Args("cluster", req.ClusterName, "ips", picked))
+	return &ipservice.IpResponse{IpAddressRange: strings.Join(picked, ";")}, nil
+}
+
+// generateIPsStatus maps a GenerateIPs error to a gRPC status. A too-small pool or
+// an unknown network is an answer to the request, not a reason to stop the server.
+func generateIPsStatus(err error) error {
+	switch {
+	case errors.Is(err, internal.ErrNetworkNotFound):
+		return status.Error(codes.NotFound, err.Error())
+	case errors.Is(err, internal.ErrNotEnoughAddresses):
+		return status.Error(codes.ResourceExhausted, err.Error())
+	default:
+		return status.Error(codes.Internal, err.Error())
+	}
+}
+
+// saveStatus maps a ledger save error: a concurrent change is Aborted, which
+// tells the client to retry the whole call; anything else is Internal.
+func saveStatus(err error) error {
+	if errors.Is(err, internal.ErrLedgerConflict) {
+		return status.Error(codes.Aborted, err.Error())
+	}
+	return status.Error(codes.Internal, err.Error())
 }
 
 func main() {

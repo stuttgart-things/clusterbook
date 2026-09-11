@@ -283,8 +283,8 @@ curl -X POST http://localhost:8080/api/v1/networks/10.31.103/assign \
 curl http://localhost:8080/api/v1/networks
 
 # 5. gRPC (requires grpcurl)
-grpcurl -plaintext localhost:50051 ipservice.IpService/GetIpAddressRange \
-  -d '{"countIpAddresses":2,"networkKey":"10.31.103"}'
+grpcurl -plaintext localhost:50051 ipservice.IpService/ReserveIpAddresses \
+  -d '{"countIpAddresses":2,"networkKey":"10.31.103","clusterName":"myapp"}'
 ```
 
 ---
@@ -296,7 +296,8 @@ grpcurl -plaintext localhost:50051 ipservice.IpService/GetIpAddressRange \
 - Env vars: `SCREAMING_SNAKE_CASE`, read only in `main.go` var block, passed as constructor args
 - Constructor returns `nil` when disabled — callers always nil-check
 - DNS provider methods return `error`; every call site must report it, never drop it (issue #187)
-- Ledger writes go through `SaveConfig` (HTTP: `if !saveConfigHTTP(w, ...) { return }`), and the handler returns **before** any DNS call when it fails — a record must never exist for a change the ledger does not hold (issue #200)
+- Ledger writes go through a `LedgerWrite` — `tx := BeginLedgerWrite(...)`, `defer tx.End()`, `tx.Load()`, `tx.Save()`. It is the only way to save, holds the process-wide lock (keep it across the DNS calls too), and in cr mode refuses a save whose resourceVersion moved (`ErrLedgerConflict` → HTTP 409, gRPC `Aborted`) (issue #199). `LoadProfile` is for reads only
+- HTTP handlers: `ipList, ok := loadForWriteHTTP(w, tx)` and `if !saveConfigHTTP(w, tx, ipList) { return }` — return **before** any DNS call when the save fails, so a record never exists for a change the ledger does not hold (issue #200)
 - The `:DNS` status marker is applied via `withDNSSuffix` — never `status + ":DNS"`, which doubles it
 - Pure helper functions (no I/O) in same file as provider, named without receiver — keeps them unit-testable
 - Test file naming: `<provider>_test.go` in same package (`package internal`)
@@ -361,6 +362,7 @@ Image is also scanned with Trivy after build.
 ## KNOWN PATTERNS TO FOLLOW
 
 - **Nil-safe providers**: `if pdns != nil { ... }` — never assume enabled
+- **One ledger write per operation**: never `LoadProfile` → modify → save by hand; overlapping writers lose updates (issue #199)
 - **Separate SSH commands**: run `set`, `commit` and the reload as individual commands — never one `&&` chain, so a failure names the failing step (issue #187)
 - **Reload fallback**: try every entry of `dnsmasqReloadCommands`; report NVRAM as committed when all fail
 - **FQDN deduplication**: always call `mergeDNSEntry` before writing — idempotent by FQDN
