@@ -1,3 +1,10 @@
+## [1.26.1](https://github.com/stuttgart-things/clusterbook/compare/v1.26.0...v1.26.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* treat only an empty status as free in every allocator ([#197](https://github.com/stuttgart-things/clusterbook/issues/197)) ([a971304](https://github.com/stuttgart-things/clusterbook/commit/a971304242bf52f84db02d1bf2e7e3cf205c622f)), closes [#196](https://github.com/stuttgart-things/clusterbook/issues/196)
+
 # [1.26.0](https://github.com/stuttgart-things/clusterbook/compare/v1.25.16...v1.26.0) (2026-09-08)
 
 
