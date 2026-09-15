@@ -1,0 +1,18 @@
+---
+# Profile for the PUBLISHED clusterbook-kustomize artifact -- the bundle
+# everyone pulls. Keep it lab-neutral; lab and test values belong in
+# tests/kcl-deploy-profile.yaml.
+#
+# config.image is deliberately absent: the release workflow pins it to the tag
+# being released (kustomize-image-key in .github/workflows/release.yaml), so a
+# value here would be overridden anyway and could only mislead. Before that pin,
+# every artifact shipped the schema default -- v1.11.0 -- whatever tag it was
+# published under (issue #208).
+#
+# config.configName is deliberately absent too: the neutral schema default is
+# what an unconfigured install gets. The artifact used to be rendered from the
+# test profile, which baked "networks-labul" -- one installation's name -- back
+# into it (see kcl/schema.k).
+config.namespace: clusterbook
+config.loadConfigFrom: cr
+config.configLocation: clusterbook

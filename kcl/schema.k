@@ -10,7 +10,14 @@ schema ClusterBook:
     namespace: str = "clusterbook"
 
     # Image
-    image: str = "ghcr.io/stuttgart-things/clusterbook:v1.11.0"
+    # Only what a local, unconfigured render gets. The published
+    # clusterbook-kustomize artifact never uses this default: the release
+    # workflow pins config.image to the tag being released, so the artifact and
+    # the image it deploys are the same version by construction. Before that,
+    # every artifact shipped this default -- then v1.11.0 -- whatever tag it was
+    # published under, and applying the newest one was a silent downgrade
+    # (issue #208).
+    image: str = "ghcr.io/stuttgart-things/clusterbook:v1.28.2"
     imagePullPolicy: str = "Always"
 
     # Replicas and resources
