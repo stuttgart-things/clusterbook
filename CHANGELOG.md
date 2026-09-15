@@ -1,3 +1,10 @@
+## [1.28.3](https://github.com/stuttgart-things/clusterbook/compare/v1.28.2...v1.28.3) (2026-09-15)
+
+
+### Bug Fixes
+
+* pin the kustomize artifact's image to the released tag ([#208](https://github.com/stuttgart-things/clusterbook/issues/208)) ([#209](https://github.com/stuttgart-things/clusterbook/issues/209)) ([8b66afa](https://github.com/stuttgart-things/clusterbook/commit/8b66afa174c9968f004338200da295936304205c))
+
 ## [1.28.2](https://github.com/stuttgart-things/clusterbook/compare/v1.28.1...v1.28.2) (2026-09-11)
 
 
