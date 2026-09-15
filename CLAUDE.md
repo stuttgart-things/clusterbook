@@ -370,3 +370,4 @@ Image is also scanned with Trivy after build.
 - **FQDN deduplication**: always call `mergeDNSEntry` before writing — idempotent by FQDN
 - **Test hierarchy**: pure helpers -> mock executor -> fake SSH server — add tests at all three levels for new SSH behaviour
 - **Env naming**: mirror pdns pattern exactly: `DDWRT_ENABLED`, `DDWRT_HOST`, `DDWRT_PASSWORD`, `DDWRT_ZONE`
+- **Kustomize artifact pins its own image**: `release.yaml` renders `kcl/release-profile.yaml` with `kustomize-image-key: config.image` — never drop that key (the schema default then ships in every artifact) and never put `config.image` or a lab-specific value like `configName` in the release profile; lab values go in `tests/kcl-deploy-profile.yaml` (issue #208)

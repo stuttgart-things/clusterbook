@@ -16,7 +16,7 @@ dagger call -m github.com/stuttgart-things/dagger/kcl@v0.82.0 run \
 # render with inline parameters
 dagger call -m github.com/stuttgart-things/dagger/kcl@v0.82.0 run \
   --source kcl \
-  --parameters 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.11.0,config.namespace=clusterbook' \
+  --parameters 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.28.2,config.namespace=clusterbook' \
   export --path /tmp/rendered-clusterbook.yaml
 ```
 
@@ -24,7 +24,7 @@ dagger call -m github.com/stuttgart-things/dagger/kcl@v0.82.0 run \
 
 ```bash
 kcl run kcl/main.k \
-  -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.11.0' \
+  -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.28.2' \
   -D 'config.namespace=clusterbook'
 ```
 
@@ -35,10 +35,26 @@ kcl run kcl/main.k \
 cd kcl && kcl run | kubectl apply -f -
 
 # or with custom config
-kcl run -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.11.0' \
+kcl run -D 'config.image=ghcr.io/stuttgart-things/clusterbook:v1.28.2' \
         -D 'config.configName=networks-labul' \
   | kubectl apply -f -
 ```
+
+## Published Kustomize Artifact
+
+Every release pushes a rendered kustomize base to
+`ghcr.io/stuttgart-things/clusterbook-kustomize:<tag>`:
+
+```bash
+flux pull artifact oci://ghcr.io/stuttgart-things/clusterbook-kustomize:v1.28.2 --output ./clusterbook
+kubectl apply -k ./clusterbook
+```
+
+It is rendered from [`release-profile.yaml`](release-profile.yaml), not the
+test profile, so it carries no lab-specific values — set `CONFIG_NAME` for your
+installation. The release workflow pins `config.image` to the tag being
+released, so the artifact `vX.Y.Z` always deploys `clusterbook:vX.Y.Z`; the
+`config.image` schema default only applies to a local, unconfigured render.
 
 ## Deploy with HTTPRoute (Gateway API)
 
@@ -55,7 +71,7 @@ kcl run -D 'config.httpRouteEnabled=true' \
 |---|---|---|
 | `config.name` | `clusterbook` | Resource name |
 | `config.namespace` | `clusterbook` | Target namespace |
-| `config.image` | `ghcr.io/stuttgart-things/clusterbook:v1.11.0` | Container image |
+| `config.image` | `ghcr.io/stuttgart-things/clusterbook:v1.28.2` | Container image |
 | `config.imagePullPolicy` | `Always` | Image pull policy |
 | `config.replicas` | `1` | Replica count |
 | `config.grpcPort` | `50051` | gRPC container port |
@@ -65,7 +81,7 @@ kcl run -D 'config.httpRouteEnabled=true' \
 | `config.serviceType` | `ClusterIP` | Service type |
 | `config.loadConfigFrom` | `cr` | Config source: `disk` or `cr` |
 | `config.configLocation` | `clusterbook` | K8s namespace or file path |
-| `config.configName` | `networks-labul` | Resource name or file name |
+| `config.configName` | `networks` | Resource name or file name |
 | `config.serverPort` | `50051` | gRPC server port env var |
 | `config.networkConfigApiGroup` | `github.stuttgart-things.com` | CRD API group for RBAC |
 | `config.httpRouteEnabled` | `false` | Enable HTTPRoute (Gateway API) |
@@ -95,7 +111,7 @@ kcl run -D 'config.httpRouteEnabled=true' \
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.28.2
 config.namespace: clusterbook
 config.configName: networks-labul
 ```
@@ -104,7 +120,7 @@ config.configName: networks-labul
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.28.2
 config.namespace: clusterbook-dev
 config.loadConfigFrom: disk
 config.configLocation: /config
@@ -115,7 +131,7 @@ config.configName: config.yaml
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.28.2
 config.namespace: clusterbook
 config.configName: networks-labul
 config.httpRouteEnabled: true
@@ -128,7 +144,7 @@ config.httpRouteHostname: clusterbook.sthings-vsphere.labul.sva.de
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.28.2
 config.namespace: clusterbook
 config.configName: networks-labul
 config.pdnsEnabled: true
@@ -141,7 +157,7 @@ config.pdnsZone: sthings.io
 
 ```yaml
 ---
-config.image: ghcr.io/stuttgart-things/clusterbook:v1.11.0
+config.image: ghcr.io/stuttgart-things/clusterbook:v1.28.2
 config.namespace: clusterbook
 config.configName: networks-labul
 config.ddwrtEnabled: true

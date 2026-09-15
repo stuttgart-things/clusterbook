@@ -25,6 +25,12 @@ jobs:
       stage-image: true
       push-kustomize: true
       kcl-source-dir: kcl
-      kcl-profile-file: tests/kcl-deploy-profile.yaml
+      # The release profile, not tests/kcl-deploy-profile.yaml: the artifact is
+      # what everyone pulls, so it must not carry one lab's values.
+      kcl-profile-file: kcl/release-profile.yaml
       kustomize-oci-repo: ghcr.io/stuttgart-things/clusterbook-kustomize
+      # Pin config.image to ghcr.io/<repo>:<released tag>. Without it the schema
+      # default wins, and every artifact deployed v1.11.0 whatever tag it was
+      # published under (issue #208).
+      kustomize-image-key: config.image
     secrets: inherit # pragma: allowlist secret
