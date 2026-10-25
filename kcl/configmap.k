@@ -20,6 +20,8 @@ configMap = {
         CONFIG_NAME: config.configName
         SERVER_PORT: config.serverPort
         HTTP_PORT: str(config.httpPort)
+        if config.basePath:
+            BASE_PATH: config.basePath
         PDNS_ENABLED: str(config.pdnsEnabled).lower()
         PDNS_URL: config.pdnsURL
         PDNS_ZONE: config.pdnsZone

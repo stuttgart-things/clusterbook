@@ -42,6 +42,7 @@ All config is via env vars. The `.env` file is loaded automatically by Taskfile.
 | `CONFIG_NAME`     | File name or CRD resource name     | required |
 | `SERVER_PORT`     | gRPC port                          | `50051`  |
 | `HTTP_PORT`       | REST/HTMX port                     | `8080`   |
+| `BASE_PATH`       | Prefix behind sthings-portal (e.g. `/clusterbook`); `/health`, `/api/v1` also at root | -        |
 
 ### PowerDNS provider
 
@@ -117,7 +118,7 @@ Both providers follow the same interface contract wired in `main.go`:
 // main.go
 pdns  := internal.NewPDNSClient(pdnsEnabled, pdnsURL, pdnsToken, pdnsZone)
 ddwrt := internal.NewDDWRTClient(ddwrtEnabled, ddwrtHost, ddwrtUser, ddwrtPassword, ddwrtZone)
-go internal.StartWebServer(httpPort, loadConfigFrom, configLocation, configName, pdns, ddwrt)
+go internal.StartWebServer(httpPort, webBasePath, loadConfigFrom, configLocation, configName, pdns, ddwrt)
 ```
 
 Both return `nil` when disabled — handlers must nil-check before calling.
@@ -370,4 +371,5 @@ Image is also scanned with Trivy after build.
 - **FQDN deduplication**: always call `mergeDNSEntry` before writing — idempotent by FQDN
 - **Test hierarchy**: pure helpers -> mock executor -> fake SSH server — add tests at all three levels for new SSH behaviour
 - **Env naming**: mirror pdns pattern exactly: `DDWRT_ENABLED`, `DDWRT_HOST`, `DDWRT_PASSWORD`, `DDWRT_ZONE`
+- **Behind sthings-portal** (`internal/portal.go`): pages use relative URLs resolved against `<base href="{{.Base}}/">` — never an absolute `/…` path in `href`/`hx-*` (`TestWebHandlerBasePath` fails on one); `HX-Redirect` targets use `basePathFrom(r)`. Every page starts its `<head>` with `pageHead` (embedded class, token copy, portal tokens) and has an `.embedded-bar`; colours go through `var(--hr-…)`
 - **Kustomize artifact pins its own image**: `release.yaml` renders `kcl/release-profile.yaml` with `kustomize-image-key: config.image` — never drop that key (the schema default then ships in every artifact) and never put `config.image` or a lab-specific value like `configName` in the release profile; lab values go in `tests/kcl-deploy-profile.yaml` (issue #208)
