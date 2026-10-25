@@ -1,6 +1,6 @@
 module github.com/stuttgart-things/clusterbook/provider
 
-go 1.26.0
+go 1.27.3
 
 require (
 	github.com/crossplane/crossplane-runtime v1.20.12
