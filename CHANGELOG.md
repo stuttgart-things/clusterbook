@@ -1,3 +1,10 @@
+# [1.29.0](https://github.com/stuttgart-things/clusterbook/compare/v1.28.3...v1.29.0) (2026-10-25)
+
+
+### Features
+
+* serve under BASE_PATH, /health and embedded header for sthings-portal ([#220](https://github.com/stuttgart-things/clusterbook/issues/220)) ([8956d30](https://github.com/stuttgart-things/clusterbook/commit/8956d30cad645c8b8dab4ffaa02922f60ccb9d21))
+
 ## [1.28.3](https://github.com/stuttgart-things/clusterbook/compare/v1.28.2...v1.28.3) (2026-09-15)
 
 
