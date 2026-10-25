@@ -11,6 +11,7 @@ _loadConfigFrom = option("config.loadConfigFrom")
 _configLocation = option("config.configLocation")
 _configName = option("config.configName")
 _serverPort = option("config.serverPort")
+_basePath = option("config.basePath")
 _httpRouteEnabled = option("config.httpRouteEnabled")
 _httpRouteParentRefName = option("config.httpRouteParentRefName")
 _httpRouteParentRefNamespace = option("config.httpRouteParentRefNamespace")
@@ -38,6 +39,8 @@ config: schema.ClusterBook = schema.ClusterBook {
         configLocation = _configLocation
     if _configName:
         configName = _configName
+    if _basePath:
+        basePath = _basePath
     if _serverPort:
         serverPort = _serverPort
     if _httpRouteEnabled:

@@ -2,6 +2,8 @@
 Schema definition for clusterbook deployment configuration
 """
 
+import regex
+
 schema ClusterBook:
     """Configuration for clusterbook Kubernetes deployment"""
 
@@ -32,6 +34,11 @@ schema ClusterBook:
     httpPort: int = 8080
     grpcServicePort: int = 80
     httpServicePort: int = 8080
+
+    # Prefix of the web UI and API behind sthings-portal, e.g. "/clusterbook"
+    # (BASE_PATH). Empty serves them at the root; /health and /api/v1 stay at
+    # the root either way.
+    basePath: str = ""
 
     # Config
     loadConfigFrom: str = "cr"
@@ -81,5 +88,6 @@ schema ClusterBook:
         replicas >= 0, "replicas must be >= 0"
         grpcPort >= 1 and grpcPort <= 65535, "grpcPort must be valid"
         httpPort >= 1 and httpPort <= 65535, "httpPort must be valid"
+        not basePath or regex.match(basePath, r"^(/[A-Za-z0-9._~-]+)+$"), "basePath must be empty or /segment[/segment...] without a trailing slash"
         name != "", "name must not be empty"
         namespace != "", "namespace must not be empty"

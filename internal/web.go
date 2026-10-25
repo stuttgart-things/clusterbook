@@ -186,9 +186,26 @@ func loadProfileHTTP(w http.ResponseWriter, loadFrom, configLoc, configNm string
 	return ipList, true
 }
 
-// StartWebServer starts the HTTP server for HTMX frontend and REST API
-func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
+// StartWebServer starts the HTTP server for HTMX frontend and REST API.
+// basePath is the prefix behind sthings-portal ("" for none), already checked
+// by ParseBasePath.
+func StartWebServer(httpPort, basePath, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) {
+	log.Printf("HTTP/HTMX SERVER LISTENING AT :%s%s", httpPort, basePath)
+	if err := http.ListenAndServe(":"+httpPort, NewWebHandler(basePath, loadFrom, configLoc, configNm, pdns, ddwrt)); err != nil {
+		log.Fatalf("FAILED TO START HTTP SERVER: %v", err)
+	}
+}
+
+// NewWebHandler builds the routes of the HTMX frontend and the REST API.
+//
+// Behind sthings-portal (basePath "/clusterbook") the portal forwards
+// /clusterbook/... unchanged, so everything answers under the prefix and the
+// pages put it on every URL (<base href>). /health (the portal's check) and
+// /api/v1 (the Crossplane provider, in-cluster clients) stay at the root too.
+func NewWebHandler(basePath, loadFrom, configLoc, configNm string, pdns *PDNSClient, ddwrt *DDWRTClient) http.Handler {
 	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /health", handleHealth)
 
 	// HTMX frontend routes
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
@@ -279,10 +296,19 @@ func StartWebServer(httpPort, loadFrom, configLoc, configNm string, pdns *PDNSCl
 		handleHTMXTestDNS(w, r, pdns, ddwrt)
 	})
 
-	log.Printf("HTTP/HTMX SERVER LISTENING AT :%s", httpPort)
-	if err := http.ListenAndServe(":"+httpPort, mux); err != nil {
-		log.Fatalf("FAILED TO START HTTP SERVER: %v", err)
+	if basePath == "" {
+		return withBasePath("", mux)
 	}
+	root := http.NewServeMux()
+	root.Handle(basePath+"/", withBasePath(basePath, http.StripPrefix(basePath, mux)))
+	root.HandleFunc("GET /health", handleHealth)
+	root.Handle("/api/", withBasePath("", mux))
+	return root
+}
+
+// handleHealth answers the portal's (and Kubernetes') liveness check.
+func handleHealth(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, map[string]string{"status": "ok"})
 }
 
 // getPoolInfos returns summary info for all network pools
@@ -367,6 +393,7 @@ func renderIPTable(w http.ResponseWriter, networkKey string, entries []IPEntry, 
 // --- HTMX Frontend Handlers ---
 
 type dashboardData struct {
+	page
 	Pools     []NetworkPoolInfo
 	Version   string
 	Commit    string
@@ -381,6 +408,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request, loadFrom, configLoc
 	pools := getPoolInfos(ipList)
 
 	data := dashboardData{
+		page:      newPage(r),
 		Pools:     pools,
 		Version:   version,
 		Commit:    commit,
@@ -410,10 +438,11 @@ func handleNetworkDetail(w http.ResponseWriter, r *http.Request, loadFrom, confi
 	pools := getPoolInfos(ipList)
 
 	data := struct {
+		page
 		NetworkKey string
 		Entries    []IPEntry
 		Pools      []NetworkPoolInfo
-	}{networkKey, entries, pools}
+	}{newPage(r), networkKey, entries, pools}
 
 	tmpl := template.Must(template.New("network").Funcs(TemplateFuncs()).Parse(networkDetailTemplate))
 	if err := tmpl.Execute(w, data); err != nil {
@@ -1438,7 +1467,7 @@ func handleHTMXAddNetwork(w http.ResponseWriter, r *http.Request, loadFrom, conf
 	}
 
 	// Redirect to the new network's detail page
-	w.Header().Set("HX-Redirect", "/network/"+network)
+	w.Header().Set("HX-Redirect", basePathFrom(r)+"/network/"+network)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -1668,7 +1697,7 @@ func handleHTMXDeleteNetwork(w http.ResponseWriter, r *http.Request, loadFrom, c
 	}
 
 	// Redirect to dashboard
-	w.Header().Set("HX-Redirect", "/")
+	w.Header().Set("HX-Redirect", basePathFrom(r)+"/")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -1711,53 +1740,58 @@ const dashboardTemplate = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    ` + pageHead + `
     <title>Clusterbook</title>
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/stuttgart-things/docs/main/hugo/sthings-argo.png">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        body { font-family: var(--hr-font); background: var(--hr-bg); color: var(--hr-text); min-height: 100vh; }
         .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-        h1 { font-size: 2rem; margin-bottom: 0.5rem; color: #f8fafc; }
-        .subtitle { color: #94a3b8; margin-bottom: 2rem; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; color: var(--hr-text); }
+        .subtitle { color: var(--hr-muted); margin-bottom: 2rem; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
-        .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; border: 1px solid #334155; transition: border-color 0.2s; }
-        .card:hover { border-color: #6366f1; }
+        .card { background: var(--hr-card); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--hr-border); transition: border-color 0.2s; }
+        .card:hover { border-color: var(--hr-accent); }
         .card a { color: inherit; text-decoration: none; display: block; }
-        .card-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: #f8fafc; }
+        .card-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--hr-text); }
         .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
         .stat { text-align: center; }
         .stat-value { font-size: 1.5rem; font-weight: 700; }
-        .stat-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-label { font-size: 0.75rem; color: var(--hr-muted); text-transform: uppercase; letter-spacing: 0.05em; }
         .available { color: #4ade80; }
         .assigned { color: #f97316; }
         .pending { color: #facc15; }
-        .bar { height: 8px; background: #334155; border-radius: 4px; overflow: hidden; display: flex; }
+        .bar { height: 8px; background: var(--hr-border); border-radius: 4px; overflow: hidden; display: flex; }
         .bar-assigned { background: #f97316; }
         .bar-pending { background: #facc15; }
         .bar-available { background: #4ade80; }
-        .total-badge { display: inline-block; background: #334155; color: #94a3b8; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; margin-top: 0.5rem; }
-        .add-card { background: #1e293b; border-radius: 12px; padding: 1.5rem; border: 2px dashed #334155; display: flex; align-items: center; justify-content: center; min-height: 180px; cursor: pointer; transition: border-color 0.2s; }
-        .add-card:hover { border-color: #6366f1; }
+        .total-badge { display: inline-block; background: var(--hr-border); color: var(--hr-muted); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; margin-top: 0.5rem; }
+        .add-card { background: var(--hr-card); border-radius: 12px; padding: 1.5rem; border: 2px dashed var(--hr-border); display: flex; align-items: center; justify-content: center; min-height: 180px; cursor: pointer; transition: border-color 0.2s; }
+        .add-card:hover { border-color: var(--hr-accent); }
         .add-form { width: 100%; }
-        .add-form input { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.875rem; width: 100%; margin-bottom: 0.5rem; }
+        .add-form input { background: var(--hr-bg); border: 1px solid var(--hr-border); color: var(--hr-text); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.875rem; width: 100%; margin-bottom: 0.5rem; }
         .add-form .row { display: flex; gap: 0.5rem; }
         .add-form .row input { width: 50%; }
         .btn-add { background: #4f46e5; color: white; padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 600; width: 100%; }
         .btn-add:hover { background: #6366f1; }
-        .add-label { color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.25rem; }
+        .add-label { color: var(--hr-muted); font-size: 0.75rem; margin-bottom: 0.25rem; }
         .banner { text-align: center; margin-bottom: 2rem; padding: 1.5rem 0; }
         .banner img { height: 140px; filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.3)); }
         .banner-title { font-family: 'Press Start 2P', cursive; font-size: 1.8rem; color: #818cf8; margin-top: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; text-shadow: 3px 3px 0px #312e81, -1px -1px 0px #4f46e5; }
         .banner-sub { font-family: 'Press Start 2P', cursive; color: #f97316; font-size: 0.65rem; margin-top: 0.5rem; letter-spacing: 0.15em; text-transform: uppercase; }
-        .footer { margin-top: 2rem; padding: 1rem; border-top: 1px solid #334155; display: flex; justify-content: center; gap: 2rem; font-size: 0.75rem; color: #64748b; }
+        .footer { margin-top: 2rem; padding: 1rem; border-top: 1px solid var(--hr-border); display: flex; justify-content: center; gap: 2rem; font-size: 0.75rem; color: #64748b; }
         .footer-item { display: flex; align-items: center; gap: 0.35rem; }
         .footer-label { color: #475569; }
-        .footer-value { color: #94a3b8; font-family: monospace; }
+        .footer-value { color: var(--hr-muted); font-family: monospace; }
     </style>
 </head>
 <body>
+    <div class="embedded-bar">
+        <span class="embedded-sub">IP address management</span>
+        <span class="embedded-stats"><span>{{len .Pools}} networks</span></span>
+    </div>
     <div class="container">
         <div class="banner">
             <img src="https://raw.githubusercontent.com/stuttgart-things/docs/main/hugo/sthings-argo.png" alt="sthings">
@@ -1767,7 +1801,7 @@ const dashboardTemplate = `<!DOCTYPE html>
         <div class="grid">
             {{range .Pools}}
             <div class="card">
-                <a href="/network/{{.NetworkKey}}">
+                <a href="network/{{.NetworkKey}}">
                     <div class="card-title">{{.NetworkKey}}.x</div>
                     <div class="stats">
                         <div class="stat">
@@ -1793,7 +1827,7 @@ const dashboardTemplate = `<!DOCTYPE html>
             </div>
             {{end}}
             <div class="add-card">
-                <form class="add-form" hx-post="/htmx/add-network" hx-swap="none">
+                <form class="add-form" hx-post="htmx/add-network" hx-swap="none">
                     <div class="card-title" style="text-align: center; margin-bottom: 1rem;">+ Add Network</div>
                     <div class="add-label">Subnet prefix (e.g. 10.31.105)</div>
                     <input type="text" name="network" placeholder="10.31.105" required>
@@ -1821,23 +1855,26 @@ const networkDetailTemplate = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    ` + pageHead + `
     <title>Clusterbook - {{.NetworkKey}}</title>
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/stuttgart-things/docs/main/hugo/sthings-argo.png">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        body { font-family: var(--hr-font); background: var(--hr-bg); color: var(--hr-text); min-height: 100vh; }
         .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
         .header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
-        .back { color: #6366f1; text-decoration: none; font-size: 1.5rem; }
-        h1 { font-size: 2rem; color: #f8fafc; }
+        .back { color: var(--hr-accent); text-decoration: none; font-size: 1.5rem; }
+        h1 { font-size: 2rem; color: var(--hr-text); }
         .layout { display: grid; grid-template-columns: 200px 1fr; gap: 2rem; }
-        .sidebar a { display: block; padding: 0.5rem 1rem; color: #94a3b8; text-decoration: none; border-radius: 6px; margin-bottom: 0.25rem; font-size: 0.875rem; }
-        .sidebar a:hover, .sidebar a.active { background: #1e293b; color: #f8fafc; }
-        table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 12px; overflow: hidden; }
-        th { background: #334155; text-align: left; padding: 0.75rem 1rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
-        td { padding: 0.75rem 1rem; border-bottom: 1px solid #334155; }
+        .layout > div { min-width: 0; }
+        #ip-table { overflow-x: auto; border-radius: 12px; }
+        .sidebar a { display: block; padding: 0.5rem 1rem; color: var(--hr-muted); text-decoration: none; border-radius: 6px; margin-bottom: 0.25rem; font-size: 0.875rem; }
+        .sidebar a:hover, .sidebar a.active { background: var(--hr-card); color: var(--hr-text); }
+        table { width: 100%; border-collapse: collapse; background: var(--hr-card); border-radius: 12px; overflow: hidden; }
+        th { background: var(--hr-border); text-align: left; padding: 0.75rem 1rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--hr-muted); }
+        td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--hr-border); }
         tr:last-child td { border-bottom: none; }
         .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
         .badge-available { background: #065f46; color: #4ade80; }
@@ -1849,12 +1886,12 @@ const networkDetailTemplate = `<!DOCTYPE html>
         .btn-release { background: #991b1b; color: white; }
         .btn-release:hover { background: #b91c1c; }
         .form-inline { display: flex; gap: 0.5rem; align-items: center; }
-        .form-inline input { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; width: 120px; }
-        .form-inline select { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; }
+        .form-inline input { background: var(--hr-bg); border: 1px solid var(--hr-border); color: var(--hr-text); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; width: 120px; }
+        .form-inline select { background: var(--hr-bg); border: 1px solid var(--hr-border); color: var(--hr-text); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; }
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: inline; }
         .toolbar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
-        .toolbar input { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; width: 80px; }
+        .toolbar input { background: var(--hr-bg); border: 1px solid var(--hr-border); color: var(--hr-text); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; width: 80px; }
         .btn-add-ip { background: #4f46e5; color: white; padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.75rem; font-weight: 600; }
         .btn-add-ip:hover { background: #6366f1; }
         .btn-danger { background: #991b1b; color: white; padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.75rem; font-weight: 600; margin-left: auto; }
@@ -1866,29 +1903,33 @@ const networkDetailTemplate = `<!DOCTYPE html>
     </style>
 </head>
 <body>
+    <div class="embedded-bar">
+        <span class="embedded-sub">IP address management</span>
+        <span class="embedded-stats"><a href="./">&larr; all networks</a></span>
+    </div>
     <div class="container">
         <div class="banner">
-            <a href="/"><img src="https://raw.githubusercontent.com/stuttgart-things/docs/main/hugo/sthings-argo.png" alt="sthings"></a>
+            <a href="./"><img src="https://raw.githubusercontent.com/stuttgart-things/docs/main/hugo/sthings-argo.png" alt="sthings"></a>
             <div class="banner-title">Clusterbook</div>
         </div>
         <div class="header">
-            <a href="/" class="back">&larr;</a>
+            <a href="./" class="back">&larr;</a>
             <h1>{{.NetworkKey}}.x</h1>
         </div>
         <div class="layout">
             <div class="sidebar">
                 {{range .Pools}}
-                <a href="/network/{{.NetworkKey}}" {{if eq $.NetworkKey .NetworkKey}}class="active"{{end}}>{{.NetworkKey}}.x</a>
+                <a href="network/{{.NetworkKey}}" {{if eq $.NetworkKey .NetworkKey}}class="active"{{end}}>{{.NetworkKey}}.x</a>
                 {{end}}
             </div>
             <div>
                 <div class="toolbar">
-                    <form class="form-inline" hx-post="/htmx/add-ip" hx-target="#ip-table" hx-swap="innerHTML">
+                    <form class="form-inline" hx-post="htmx/add-ip" hx-target="#ip-table" hx-swap="innerHTML">
                         <input type="hidden" name="network_key" value="{{.NetworkKey}}">
                         <input type="text" name="ip" placeholder="Last octet" required style="width: 90px;">
                         <button type="submit" class="btn-add-ip">+ Add IP</button>
                     </form>
-                    <form hx-post="/htmx/delete-network" hx-swap="none" hx-confirm="Delete network {{.NetworkKey}}? This cannot be undone.">
+                    <form hx-post="htmx/delete-network" hx-swap="none" hx-confirm="Delete network {{.NetworkKey}}? This cannot be undone.">
                         <input type="hidden" name="network_key" value="{{.NetworkKey}}">
                         <button type="submit" class="btn-danger">Delete Network</button>
                     </form>
@@ -1914,8 +1955,8 @@ const ipTablePartial = `<table>
         <tr>
             <td style="font-family: monospace;">{{.IP}}</td>
             <td>
-                {{if hasPrefix .Status "ASSIGNED"}}<span class="badge badge-assigned">ASSIGNED</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span> <span id="dns-test-{{.Digit}}" style="display:inline;"><button class="btn" style="background:#334155;color:#60a5fa;font-size:0.6rem;padding:0.2rem 0.4rem;" hx-post="/htmx/test-dns" hx-vals='{"cluster":"{{.Cluster}}","expected_ip":"{{.IP}}"}' hx-target="#dns-test-{{.Digit}}" hx-swap="innerHTML">Test</button></span>{{end}}
-                {{else if hasPrefix .Status "PENDING"}}<span class="badge badge-pending">PENDING</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span> <span id="dns-test-{{.Digit}}" style="display:inline;"><button class="btn" style="background:#334155;color:#60a5fa;font-size:0.6rem;padding:0.2rem 0.4rem;" hx-post="/htmx/test-dns" hx-vals='{"cluster":"{{.Cluster}}","expected_ip":"{{.IP}}"}' hx-target="#dns-test-{{.Digit}}" hx-swap="innerHTML">Test</button></span>{{end}}
+                {{if hasPrefix .Status "ASSIGNED"}}<span class="badge badge-assigned">ASSIGNED</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span> <span id="dns-test-{{.Digit}}" style="display:inline;"><button class="btn" style="background:#334155;color:#60a5fa;font-size:0.6rem;padding:0.2rem 0.4rem;" hx-post="htmx/test-dns" hx-vals='{"cluster":"{{.Cluster}}","expected_ip":"{{.IP}}"}' hx-target="#dns-test-{{.Digit}}" hx-swap="innerHTML">Test</button></span>{{end}}
+                {{else if hasPrefix .Status "PENDING"}}<span class="badge badge-pending">PENDING</span>{{if hasSuffix .Status ":DNS"}} <span class="badge" style="background: #1e3a5f; color: #60a5fa; font-size: 0.65rem;">DNS</span> <span id="dns-test-{{.Digit}}" style="display:inline;"><button class="btn" style="background:#334155;color:#60a5fa;font-size:0.6rem;padding:0.2rem 0.4rem;" hx-post="htmx/test-dns" hx-vals='{"cluster":"{{.Cluster}}","expected_ip":"{{.IP}}"}' hx-target="#dns-test-{{.Digit}}" hx-swap="innerHTML">Test</button></span>{{end}}
                 {{else}}<span class="badge badge-available">AVAILABLE</span>
                 {{end}}
             </td>
@@ -1923,7 +1964,7 @@ const ipTablePartial = `<table>
             <td>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                 {{if or (hasPrefix .Status "ASSIGNED") (hasPrefix .Status "PENDING")}}
-                <form class="form-inline" hx-post="/htmx/edit" hx-target="#ip-table" hx-swap="innerHTML">
+                <form class="form-inline" hx-post="htmx/edit" hx-target="#ip-table" hx-swap="innerHTML">
                     <input type="hidden" name="ip" value="{{.IP}}">
                     <input type="hidden" name="network_key" value="{{$.NetworkKey}}">
                     <input type="text" name="cluster" value="{{.Cluster}}" placeholder="Cluster name" required>
@@ -1934,13 +1975,13 @@ const ipTablePartial = `<table>
                     <label style="display: flex; align-items: center; gap: 0.15rem; font-size: 0.75rem; color: #94a3b8; cursor: pointer; white-space: nowrap;"><input type="checkbox" name="create_dns" {{if hasSuffix .Status ":DNS"}}checked{{end}} style="accent-color: #6366f1; margin-right: 0.15rem;"> DNS</label>
                     <button type="submit" class="btn btn-assign">Save</button>
                 </form>
-                <form class="form-inline" hx-post="/htmx/release" hx-target="#ip-table" hx-swap="innerHTML">
+                <form class="form-inline" hx-post="htmx/release" hx-target="#ip-table" hx-swap="innerHTML">
                     <input type="hidden" name="ip" value="{{.IP}}">
                     <input type="hidden" name="network_key" value="{{$.NetworkKey}}">
                     <button type="submit" class="btn btn-release">Release</button>
                 </form>
                 {{else}}
-                <form class="form-inline" hx-post="/htmx/assign" hx-target="#ip-table" hx-swap="innerHTML">
+                <form class="form-inline" hx-post="htmx/assign" hx-target="#ip-table" hx-swap="innerHTML">
                     <input type="hidden" name="ip" value="{{.IP}}">
                     <input type="hidden" name="network_key" value="{{$.NetworkKey}}">
                     <input type="text" name="cluster" placeholder="Cluster name" required>
@@ -1952,7 +1993,7 @@ const ipTablePartial = `<table>
                     <button type="submit" class="btn btn-assign">Assign</button>
                 </form>
                 {{end}}
-                <form hx-post="/htmx/delete-ip" hx-target="#ip-table" hx-swap="innerHTML" hx-confirm="Remove {{.IP}} from this network?">
+                <form hx-post="htmx/delete-ip" hx-target="#ip-table" hx-swap="innerHTML" hx-confirm="Remove {{.IP}} from this network?">
                     <input type="hidden" name="ip" value="{{.IP}}">
                     <input type="hidden" name="network_key" value="{{$.NetworkKey}}">
                     <button type="submit" class="btn btn-release" style="font-size: 0.65rem; padding: 0.3rem 0.5rem;">&#x2715;</button>

@@ -114,6 +114,16 @@ The HTMX dashboard is available on port `:8080` (configurable via `HTTP_PORT`).
 
 - **Dashboard**: `http://localhost:8080/` - overview of all network pools
 - **Network Detail**: `http://localhost:8080/network/10.31.103` - IP table with inline assign/release
+- **Health**: `http://localhost:8080/health` - `{"status":"ok"}`
+
+**Behind sthings-portal** set `BASE_PATH=/clusterbook`. The portal forwards
+`/clusterbook/...` unchanged; the pages answer under the prefix and resolve
+their links against `<base href>`. `/health` and `/api/v1` also stay at the
+root, so the Crossplane provider and in-cluster clients keep their URL.
+Inside the portal's frame the banner gives way to one compact line, and a
+request through the portal (`X-Forwarded-Prefix`) links the portal's design
+tokens (`/static/homerun2-tokens.css`). Opened on its own the page keeps its
+full banner.
 
 </details>
 
@@ -383,6 +393,7 @@ EOF
 | `CONFIG_NAME` | File name or resource name | - |
 | `SERVER_PORT` | gRPC server port | `50051` |
 | `HTTP_PORT` | HTTP/HTMX server port | `8080` |
+| `BASE_PATH` | Prefix of web UI and API behind [sthings-portal](https://github.com/stuttgart-things/sthings-portal), e.g. `/clusterbook` (KCL `config.basePath`); `/health` and `/api/v1` also stay at the root | - |
 | `RECLAIMER_INTERVAL` | Lease reclaimer scan interval (Go duration, e.g. `60s`, `5m`). Set `0` to disable. | `60s` |
 | `KUBECONFIG` | K8s config path (for CR backend) | - |
 | `PDNS_ENABLED` | Enable PowerDNS integration | `false` |

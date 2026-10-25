@@ -39,6 +39,7 @@ var (
 	configLocation = os.Getenv("CONFIG_LOCATION")
 	serverPort     = os.Getenv("SERVER_PORT")
 	httpPort       = os.Getenv("HTTP_PORT")
+	basePath       = os.Getenv("BASE_PATH")
 	pdnsEnabled    = os.Getenv("PDNS_ENABLED")
 	pdnsURL        = os.Getenv("PDNS_URL")
 	pdnsToken      = os.Getenv("PDNS_TOKEN")
@@ -249,8 +250,14 @@ func main() {
 	pdns := internal.NewPDNSClient(pdnsEnabled, pdnsURL, pdnsToken, pdnsZone)
 	ddwrt := internal.NewDDWRTClient(ddwrtEnabled, ddwrtHost, ddwrtUser, ddwrtPassword, ddwrtZone)
 
+	// BASE_PATH: prefix of UI and API behind sthings-portal
+	webBasePath, err := internal.ParseBasePath(basePath)
+	if err != nil {
+		log.Fatalf("INVALID BASE_PATH: %v", err)
+	}
+
 	// START HTTP/HTMX SERVER IN BACKGROUND
-	go internal.StartWebServer(httpPort, loadConfigFrom, configLocation, configName, pdns, ddwrt)
+	go internal.StartWebServer(httpPort, webBasePath, loadConfigFrom, configLocation, configName, pdns, ddwrt)
 
 	// START LEASE RECLAIMER IN BACKGROUND
 	interval := defaultReclaimerInterval
